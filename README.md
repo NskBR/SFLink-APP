@@ -11,7 +11,7 @@ Gerenciador de arquivos entre Windows e Android pela rede Wi-Fi. Explore as past
 - “Lembrar dispositivo” autoriza reconexão sem repetir o código. Revogação disponível no Android.
 - Atualizador pelo GitHub Releases, com conferência de tamanho/SHA-256 e confirmação de instalação.
 
-Versão em desenvolvimento: **0.3.0**. Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
+Versão de distribuição: **0.3.0**. [Baixe a release](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
 
 ## Capturas de demonstração
 
@@ -27,7 +27,7 @@ Windows: instale Node.js, Rust e as ferramentas de compilação do Tauri para Wi
 
 Android: abra `android/` no Android Studio, configure o SDK localmente e sincronize o Gradle. Requer Android 11 ou superior. O usuário precisa autorizar acesso aos arquivos no celular. Para um APK de teste: `gradlew.bat :app:assemblePreview`. Preview usa assinatura de desenvolvimento.
 
-Para produção e atualização Android, configure uma chave privada estável fora do Git. Consulte o [guia de atualização e assinatura](desktop/docs/updates.md). Nenhum APK/instalador ou material de assinatura integra este repositório-fonte.
+Para produção e atualização Android, configure uma chave privada estável fora do Git. Consulte o [guia de atualização e assinatura](desktop/docs/updates.md). Os binários ficam nos assets da release; nenhum material de assinatura integra o repositório-fonte. Se você usa um APK preview anterior, leia a orientação de migração na release: a assinatura de produção é diferente e exige uma primeira reinstalação/novo pareamento.
 
 ## Testes e documentação
 
@@ -39,3 +39,7 @@ Para produção e atualização Android, configure uma chave privada estável fo
 - [Validação desta versão](docs/validation.md).
 
 Para reproduzir a captura desktop, execute o Vite em `desktop/` e abra `/docs-preview.html`; essa entrada usa componentes reais com dados fixos e não integra o build principal. A captura Android é gerada pelo teste `DemoScreenshotTest` em `android/app/src/androidTest/`; a fixture não abre servidor nem grava autorização real.
+
+## Builds de distribuição
+
+Os builds são locais, sem GitHub Actions. O script `tools/build-release.ps1` usa as variáveis de assinatura documentadas e gera os arquivos em `artifacts/` (ignorado pelo Git), incluindo `SHA256SUMS.txt`. A publicação dos assets é uma etapa separada.

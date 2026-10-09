@@ -38,6 +38,10 @@ SFLINK_KEY_PASSWORD
 
 Guarde a chave de produção fora do repositório, com backup privado, e use a mesma nas releases seguintes. Sem essas variáveis o build release fica sem assinatura de distribuição; não o publique. `gradlew.bat :app:assembleRelease` gera o APK de produção quando a assinatura está configurada. Para testes locais, `:app:assemblePreview` continua usando debug; nunca inclua o keystore, senhas, `local.properties` ou exportações de conexão no Git.
 
-Não publique versões novas sem testar a atualização de uma versão anterior assinada com a mesma chave, verificando que os dispositivos lembrados continuam disponíveis. O fluxo completo via release fica pendente até existir uma release oficial com os assets corretos; os testes locais de regras/build não substituem essa validação.
+Não publique versões novas sem testar a atualização de uma versão anterior assinada com a mesma chave, verificando que os dispositivos lembrados continuam disponíveis. A 0.3.0 inaugura o canal oficial de distribuição. Os APKs de produção passam a usar uma chave própria permanente, distinta do preview. O teste completo entre duas releases públicas exige uma versão posterior; os testes locais de regras/build não substituem essa validação.
+
+O script `tools/build-release.ps1` na raiz do repositório automatiza os builds locais e os checksums, sem publicar e sem GitHub Actions. A senha/chave continuam sendo fornecidas por ambiente.
+
+Certificado público da assinatura Android (SHA-256): `0ce84853a7b97ea03b738c2b95c90e3c05e4fc6aede95fc891a6067abe80e58e`.
 
 Referências: [GitHub Releases API](https://docs.github.com/en/rest/releases/releases), [assinatura Android](https://developer.android.com/studio/publish/app-signing), [permissão de instalação](https://developer.android.com/reference/android/content/pm/PackageManager#canRequestPackageInstalls()).

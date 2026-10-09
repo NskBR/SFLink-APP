@@ -21,4 +21,5 @@ remembered.dat
 conexao*.json
 connection*.json
 pairing/
+artifacts/
 desktop/src-tauri/gen/
