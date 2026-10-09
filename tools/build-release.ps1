@@ -11,6 +11,9 @@ function Assert-BuildExit {
 }
 New-Item -ItemType Directory -Path $releaseDirectory -Force | Out-Null
 if (-not $AndroidOnly) {
+    # Rust panic locations can otherwise embed the builder's personal paths.
+    $pathRemap = "--remap-path-prefix=$($env:USERPROFILE)=/build"
+    $env:CARGO_ENCODED_RUSTFLAGS = if ($env:CARGO_ENCODED_RUSTFLAGS) { $env:CARGO_ENCODED_RUSTFLAGS + [char]31 + $pathRemap } else { $pathRemap }
     Push-Location (Join-Path $repositoryRoot 'desktop')
     try {
         npm ci
