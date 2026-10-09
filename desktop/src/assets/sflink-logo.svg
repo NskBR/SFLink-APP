@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="912" viewBox="100 212 1120 912" fill="none">
+<title>Logo de transferência de arquivos via Wi-Fi</title>
+<desc>Símbolo vetorial com degradê suave de ciano para turquesa e fundo transparente.</desc>
+<defs><linearGradient id="brand" gradientUnits="userSpaceOnUse" x1="200" y1="1000" x2="1050" y2="300"><stop stop-color="#00B8D9"/><stop offset="1" stop-color="#00E6B8"/></linearGradient></defs><g fill="url(#brand)">
+<path d="M391 292H867C883 292 890 304 879 317L778 431C771 439 760 444 747 444H371C310 444 265 469 265 509C265 547 303 568 347 568H611C628 568 635 580 625 594L550 692C541 704 526 710 509 710H241C163 710 111 646 111 566C111 425 238 292 391 292Z"/>
+<path d="M1150 570C1161 570 1165 580 1155 592L1047 712C1039 721 1027 726 1013 726H783C757 726 738 735 721 755L685 797H891C912 797 917 811 904 826L835 904C828 912 817 916 803 916H622C597 916 580 925 565 944L512 1008C491 1033 470 1046 441 1057L273 1115C257 1121 248 1110 260 1096L661 601C677 581 701 570 730 570Z"/>
+<circle cx="955" cy="494" r="49"/>
+</g>
+<g stroke="url(#brand)" stroke-width="64" stroke-linecap="round">
+<path d="M933 254C1063 268 1168 373 1183 503"/>
+<path d="M934 358C1012 368 1074 430 1088 510"/>
+</g>
+</svg>
