@@ -9,7 +9,7 @@
 
 ## Limites desta validação
 
-Não foi publicada uma release nem executado o ciclo completo de baixar uma release e substituir uma instalação anterior. Isso exige assets assinados e versões sequenciais reais. A permanência das autorizações durante atualização de produção também precisa ser conferida nesse ciclo.
+A 0.3.0 é a primeira release desse canal. O ciclo completo de baixar uma versão posterior e substituir uma instalação anterior ainda exige duas releases sequenciais reais. A permanência das autorizações durante uma atualização de produção também precisa ser conferida nesse ciclo.
 
 As transferências em celular físico foram confirmadas durante o desenvolvimento anterior. Os resultados desta alteração são de build/testes locais e emulador; não equivalem a nova validação de atualização ou descoberta em todas as redes/celulares físicos.
 
