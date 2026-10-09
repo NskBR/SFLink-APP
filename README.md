@@ -11,7 +11,7 @@ Gerenciador de arquivos entre Windows e Android pela rede Wi-Fi. Explore as past
 - “Lembrar dispositivo” autoriza reconexão sem repetir o código. Revogação disponível no Android.
 - Atualizador pelo GitHub Releases, com conferência de tamanho/SHA-256 e confirmação de instalação.
 
-Versão de distribuição: **0.3.0**. [Baixe a release](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
+Desktop: **0.3.1** · Android: **0.3.0**. [Baixe a release desktop](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.1) ou o [APK Android 0.3.0](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
 
 ## Capturas de demonstração
 

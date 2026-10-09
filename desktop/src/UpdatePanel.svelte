@@ -38,7 +38,7 @@
 </script>
 
 <div class="update-card">
-  <div><h3>Atualizações do SFLink</h3><p>Versão 0.3.0 · Atualizações pelo GitHub Releases</p></div>
+  <div><h3>Atualizações do SFLink</h3><p>Versão 0.3.1 · Atualizações pelo GitHub Releases</p></div>
   {#if info?.available}<strong>Versão {info.version} disponível</strong>{#if info.notes}<p class="release-notes">{info.notes}</p>{/if}{/if}
   {#if downloading}<progress max={total || 1} value={downloaded}></progress><p>{bytes(downloaded)} de {bytes(total)}</p>{/if}
   {#if message}<p role="status">{message}</p>{/if}

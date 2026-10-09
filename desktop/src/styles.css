@@ -49,3 +49,7 @@ main{padding:0;background:none;gap:12px}.topbar{height:70px;padding:14px 22px;ba
 .remembered-heading h3{font-size:16px;margin:0 0 7px}.remembered-heading p,.remembered-help{color:var(--muted);font-size:13px;line-height:1.6}
 .remembered-card{margin:10px 0}.remembered-card .online{color:#20e3ad}.remembered-card>div{flex:1}.remembered-help{padding:14px 0}
 .page-section .full-empty{height:auto;min-height:280px;padding:30px 20px}
+
+/* Native desktop behavior: drag gestures do not select interface labels. */
+body{-webkit-user-select:none;user-select:none}
+input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text}
