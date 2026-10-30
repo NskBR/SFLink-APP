@@ -3,7 +3,13 @@
   import type { Entry, Listing, Side } from './lib/types';
   import { bytes } from './lib/types';
   import { focusInput } from './lib/focus';
+  import PhotoThumbnail from './PhotoThumbnail.svelte';
+  import type { Transfer } from './lib/types';
   export let side: Side;
+  export let active = false;
+  export let transfers: Transfer[] = [];
+  export let onActivate: () => void = () => {};
+  export let onVisible: (entries: Entry[]) => void = () => {};
   export let title: string;
   export let listing: Listing = { path: '', parent: null, entries: [] };
   export let loading = false;
@@ -25,10 +31,13 @@
   export let onDelete: () => void;
   export let onTransfer: () => void;
   export let onDrag: (entry: Entry, event: PointerEvent) => void;
+  let searchInput: HTMLInputElement;
+  export function focusSearch() { searchInput?.focus(); searchInput?.select(); }
   let search = '';
   let editingPath = false;
   let typedPath = '';
   $: filtered = listing.entries.filter(entry => entry.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+  $: onVisible(filtered);
   $: pieces = listing.path.split(/[\\/]/).filter(Boolean);
   function icon(entry: Entry) {
     if (entry.isDir) return Folder;
@@ -38,7 +47,7 @@
   }
 </script>
 
-<section class:drop-active={dropActive} class:connected class="file-pane" data-side={side} aria-label={title}>
+<section on:pointerdown={onActivate} on:focusin={onActivate} class:active-pane={active} class:drop-active={dropActive} class:connected class="file-pane" data-side={side} aria-label={title}>
   <header class="pane-heading">
     <div class="pane-title">{#if side === 'local'}<Monitor size={24}/>{:else}<Smartphone size={24}/>{/if}<h2>{title}</h2></div>
     <span class="pane-kind">{side === 'local' ? 'Neste computador' : 'Via Wi-Fi'}</span>
@@ -56,7 +65,7 @@
     <button class="icon-button" title="Atualizar pasta" aria-label="Atualizar pasta" disabled={!listing.path || loading} on:click={onRefresh}><RefreshCw size={17} class={loading ? 'spin' : ''}/></button>
   </div>
   <div class="pane-tools">
-    <label class="search"><Search size={16}/><input placeholder="Pesquisar nesta pasta…" aria-label={`Pesquisar em ${title}`} bind:value={search} disabled={!connected}/>{#if search}<button title="Limpar pesquisa" aria-label="Limpar pesquisa" on:click={() => search = ''}>×</button>{/if}</label>
+    <label class="search"><Search size={16}/><input bind:this={searchInput} data-search={side} placeholder="Pesquisar nesta pasta…" aria-label={`Pesquisar em ${title}`} bind:value={search} disabled={!connected}/>{#if search}<button title="Limpar pesquisa" aria-label="Limpar pesquisa" on:click={() => search = ''}>×</button>{/if}</label>
     <button class="small-button" title="Criar pasta" disabled={!listing.path || loading} on:click={onNewFolder}><FolderPlus size={16}/><span>Nova pasta</span></button>
     {#if side === 'local'}<button class="icon-button" aria-label="Escolher pasta do PC" title="Escolher pasta do PC" disabled={!desktop} on:click={onChoose}><FolderOpen size={17}/></button>{/if}
   </div>
@@ -81,8 +90,9 @@
     {:else}
       {#each filtered as entry (entry.path)}
         {@const Icon = icon(entry)}
-        <button class="file-row" class:selected={selected.includes(entry.path)} aria-pressed={selected.includes(entry.path)} title={entry.name} on:click={(event) => onSelect(entry, event)} on:dblclick={() => onOpen(entry)} on:keydown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onOpen(entry); } }} on:pointerdown|preventDefault={(event) => onDrag(entry, event)}>
-          <span class="file-name"><span class="file-icon" class:folder={entry.isDir} class:audio={Icon === Music2} class:image={Icon === Image}><Icon size={21} fill={entry.isDir ? 'currentColor' : 'none'} strokeWidth={1.6}/></span><span>{entry.name}</span></span>
+        {@const status = [...transfers].reverse().find(t => t.source === entry.path && t.direction === (side === 'local' ? 'upload' : 'download'))}
+        <button class="file-row" class:selected={selected.includes(entry.path)} aria-pressed={selected.includes(entry.path)} title={entry.name} on:click={(event) => onSelect(entry, event)} on:dblclick={() => onOpen(entry)} on:keydown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onOpen(entry); } }} on:pointerdown={(event) => { event.currentTarget.focus({ preventScroll: true }); onDrag(entry, event); }}>
+          <span class="file-name">{#if !entry.isDir && /\.(jpe?g|png|webp)$/i.test(entry.name)}{#key `${entry.path}:${entry.modified}:${entry.size}`}<PhotoThumbnail {side} path={entry.path}/>{/key}{:else}<span class="file-icon" class:folder={entry.isDir} class:audio={Icon === Music2} class:image={Icon === Image}><Icon size={21} fill={entry.isDir ? 'currentColor' : 'none'} strokeWidth={1.6}/></span>{/if}<span class="file-label"><span>{entry.name}</span>{#if status}<span class="row-transfer-status" class:failed={status.status === 'error'}>{status.status === 'running' ? `${status.direction === 'upload' ? 'Enviando' : 'Baixando'} · ${status.total ? Math.min(100, Math.round(status.transferred / status.total * 100)) + '%' : bytes(status.transferred)}` : status.status === 'queued' ? `Na fila para ${status.direction === 'upload' ? 'enviar' : 'baixar'}` : status.status === 'done' ? (status.direction === 'upload' ? 'Enviado' : 'Baixado') : status.status === 'cancelled' ? 'Cancelado' : 'Falha na transferência'}</span>{#if status.status === 'running'}<span class="row-progress"><span style={`width:${status.total ? Math.min(100, status.transferred / status.total * 100) : 0}%`}></span></span>{/if}{/if}</span></span>
           <span class="file-size">{entry.isDir ? '—' : bytes(entry.size)}</span>
         </button>
       {/each}
@@ -98,3 +108,9 @@
     </div>
   </footer>
 </section>
+
+<style>
+  .file-pane.active-pane{outline:1px solid #205444;outline-offset:-1px}
+  .file-label{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}.file-label>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row-transfer-status{font-size:10px;color:var(--accent)}.row-transfer-status.failed{color:#f3adb3}.row-progress{height:3px;max-width:180px;border-radius:3px;background:#26342e;overflow:hidden}.row-progress>span{display:block;height:100%;background:var(--accent)}
+</style>

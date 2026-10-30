@@ -18,3 +18,7 @@ As transferências em celular físico foram confirmadas durante o desenvolviment
 APK release compilado localmente com R8, sem flag debuggable, assinado com a chave de produção SFLink; assinatura validada pelo apksigner. Lint release: zero erros. O APK assinado passou, em emulador temporário, no pareamento por código com conferência TLS, lembrança do PC, upload/download de 2 MB, exclusão do arquivo de teste e reconexão autenticada após reiniciar o app.
 
 O instalador Windows foi compilado localmente a partir dos mesmos arquivos de execução/configuração publicados; está sem assinatura Authenticode. Nenhum workflow de Actions foi criado ou usado. A primeira release estabelece o canal; a substituição entre duas releases públicas permanece pendente para uma versão seguinte.
+
+## Desktop 0.4.0
+
+Build frontend sem erros/avisos. Treze testes Rust passaram (quatro testes de conexão manual ignorados). Cobertura adicional: miniatura PNG reduzida, rejeição de dados corrompidos e escolha de nome sem substituir arquivos existentes. Validação de interface com IPC simulado: Ctrl+F no painel ativo, Ctrl+A nos resultados filtrados, Ctrl+Delete com confirmação, F2, duplo clique aguardando o download para abrir, status Enviando/Baixando e carregamento de miniatura. A simulação não substitui a validação dessas novidades com um celular físico. O WebView2 tem os atalhos de navegador desativados nativamente para evitar a busca de página no Ctrl+F.

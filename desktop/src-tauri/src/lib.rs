@@ -6,10 +6,11 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, State, Manager};
 use tauri_plugin_opener::OpenerExt;
 use tokio::io::AsyncWriteExt;
 use tokio_util::{io::ReaderStream, sync::CancellationToken};
+mod previews;
 mod updater;
 mod remembered;
 use remembered::{connect_remembered, connection_health, forget_remembered, remembered_devices};
@@ -592,8 +593,10 @@ async fn transfer_file(
     direction: String,
     source: String,
     destination: String,
-) -> Result<(), String> {
+    open_after: Option<bool>,
+) -> Result<Option<String>, String> {
     let remote = remote(&state)?;
+    let target_name = if open_after == Some(true) && direction == "download" { Some(available_download_name(Path::new(&destination), source.rsplit('/').next().ok_or("Nome inválido.")?)?) } else { None };
     let cancel = CancellationToken::new();
     {
         let mut map = state.transfers.lock().map_err(err)?;
@@ -605,18 +608,35 @@ async fn transfer_file(
     }
     let result = tokio::select! {
         _ = cancel.cancelled() => Err("Transferência cancelada.".into()),
-        result = transfer(move |progress| { let _ = app.emit("transfer-progress", progress); }, &remote, &id, &direction, &source, &destination) => result,
+        result = transfer_with_name(move |progress| { let _ = app.emit("transfer-progress", progress); }, &remote, &id, &direction, &source, &destination, target_name.as_deref()) => result,
     };
     state.transfers.lock().map_err(err)?.remove(&id);
-    result
+    result?;
+    Ok(target_name.map(|name| Path::new(&destination).join(name).to_string_lossy().into_owned()))
 }
-async fn transfer<F: Fn(Progress) + Clone + Send + Sync + 'static>(
+fn available_download_name(parent: &Path, name: &str) -> Result<String, String> {
+    valid_name(name)?;
+    let original = Path::new(name);
+    let stem = original.file_stem().and_then(|v| v.to_str()).unwrap_or(name);
+    let extension = original.extension().and_then(|v| v.to_str()).map(|v| format!(".{v}")).unwrap_or_default();
+    for index in 0..10_000 {
+        let candidate = if index == 0 { name.to_string() } else { format!("{stem} ({index}){extension}") };
+        if !parent.join(&candidate).exists() { return Ok(candidate); }
+    }
+    Err("Não foi possível escolher um nome livre para o download.".into())
+}
+#[cfg(test)]
+async fn transfer<F: Fn(Progress) + Clone + Send + Sync + 'static>(emit: F, remote: &Remote, id: &str, direction: &str, source: &str, destination: &str) -> Result<(), String> {
+    transfer_with_name(emit, remote, id, direction, source, destination, None).await
+}
+async fn transfer_with_name<F: Fn(Progress) + Clone + Send + Sync + 'static>(
     emit: F,
     remote: &Remote,
     id: &str,
     direction: &str,
     source: &str,
     destination: &str,
+    target_name: Option<&str>,
 ) -> Result<(), String> {
     if direction == "upload" {
         let file = tokio::fs::File::open(source).await.map_err(err)?;
@@ -664,7 +684,7 @@ async fn transfer<F: Fn(Progress) + Clone + Send + Sync + 'static>(
             .map_err(err)?;
         checked(response).await?;
     } else if direction == "download" {
-        let name = source.rsplit('/').next().ok_or("Nome inválido.")?;
+        let name = target_name.or_else(|| source.rsplit('/').next()).ok_or("Nome inválido.")?;
         valid_name(name)?;
         let target = Path::new(destination).join(name);
         if target.exists() {
@@ -711,9 +731,24 @@ async fn transfer<F: Fn(Progress) + Clone + Send + Sync + 'static>(
 
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            #[cfg(windows)]
+            if let Some(window) = app.get_webview_window("main") {
+                window.with_webview(|view| unsafe {
+                    use windows_core::Interface;
+                    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
+                    let result = (|| -> windows_core::Result<()> {
+                        view.controller().CoreWebView2()?.Settings()?.cast::<ICoreWebView2Settings3>()?.SetAreBrowserAcceleratorKeysEnabled(false)
+                    })();
+                    if let Err(error) = result { eprintln!("Não foi possível desativar os atalhos do navegador: {error}"); }
+                })?;
+            }
+            Ok(())
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
+        .manage(previews::PreviewJobs::default())
         .manage(updater::Updater::default())
         .invoke_handler(tauri::generate_handler![
             updater::check_for_updates,
@@ -726,6 +761,7 @@ pub fn run() {
             local_rename,
             local_trash,
             local_open,
+            previews::image_thumbnail,
             read_pairing,
             connect_device,
             pair_device,
@@ -746,6 +782,14 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn double_click_download_preserves_existing_names() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("foto.jpg"), b"original").unwrap();
+        std::fs::write(directory.path().join("foto (1).jpg"), b"other").unwrap();
+        assert_eq!(available_download_name(directory.path(), "foto.jpg").unwrap(), "foto (2).jpg");
+        assert_eq!(std::fs::read(directory.path().join("foto.jpg")).unwrap(), b"original");
+        assert!(available_download_name(directory.path(), "../escape.jpg").is_err());
+    }
     use tokio::io::AsyncReadExt;
     #[tokio::test]
     #[ignore = "Requires Android approval with Remember device selected"]

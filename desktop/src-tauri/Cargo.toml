@@ -1,6 +1,6 @@
 [package]
 name = "wifi-files"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
 
 [lib]
@@ -16,6 +16,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+base64 = "0.23"
 dirs = "6"
 trash = "5"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
@@ -25,6 +26,8 @@ futures-util = "0.3"
 tempfile = "3"
 
 [target.'cfg(windows)'.dependencies]
+webview2-com = "0.39"
+windows-core = "0.62"
 windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_Foundation", "Win32_Security_Cryptography"] }
 
 [dependencies.image]

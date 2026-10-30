@@ -11,7 +11,7 @@ Gerenciador de arquivos entre Windows e Android pela rede Wi-Fi. Explore as past
 - “Lembrar dispositivo” autoriza reconexão sem repetir o código. Revogação disponível no Android.
 - Atualizador pelo GitHub Releases, com conferência de tamanho/SHA-256 e confirmação de instalação.
 
-Desktop: **0.3.1** · Android: **0.3.0**. [Baixe a release desktop](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.1) ou o [APK Android 0.3.0](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
+Desktop: **0.4.0** · Android: **0.3.0**. [Baixe a release desktop](https://github.com/NskBR/SFLink-APP/releases/tag/v0.4.0) ou o [APK Android 0.3.0](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
 
 ## Capturas de demonstração
 
@@ -43,3 +43,9 @@ Para reproduzir a captura desktop, execute o Vite em `desktop/` e abra `/docs-pr
 ## Builds de distribuição
 
 Os builds são locais, sem GitHub Actions. O script `tools/build-release.ps1` usa as variáveis de assinatura documentadas e gera os arquivos em `artifacts/` (ignorado pelo Git), incluindo `SHA256SUMS.txt`. A publicação dos assets é uma etapa separada.
+
+## Atalhos e abertura de arquivos
+
+Clique em um painel para ativá-lo. Ctrl+F foca a pesquisa desse painel; Ctrl+A seleciona os resultados visíveis; Delete/Ctrl+Delete abre a confirmação de exclusão; F2 renomeia; F5/Ctrl+R atualiza a pasta; Ctrl+Shift+N cria pasta; Backspace sobe um nível. Em campos de texto, os atalhos de edição continuam funcionando. Shift+clique seleciona um intervalo e Ctrl+clique alterna a seleção.
+
+Dois cliques em arquivo do celular baixa para a pasta aberta no PC e abre no aplicativo padrão do Windows após concluir. Arquivos existentes são preservados, usando um novo nome quando necessário. Não há cache separado. As miniaturas JPG/PNG/WebP são carregadas quando aparecem na lista, ficam apenas em memória e têm limites de tamanho/decodificação. Imagens grandes ou inválidas mantêm o ícone. A fila e as linhas dos arquivos mostram Enviando/Baixando e progresso.
