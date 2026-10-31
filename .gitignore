@@ -23,3 +23,5 @@ connection*.json
 pairing/
 artifacts/
 desktop/src-tauri/gen/
+
+downloaded-files.json

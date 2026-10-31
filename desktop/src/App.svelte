@@ -10,6 +10,7 @@
   import TitleBar from './TitleBar.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import MediaModal from './MediaModal.svelte';
+  import PhotoThumbnail from './PhotoThumbnail.svelte';
   import { startUpdateChecks, setUpdateTransfers } from './lib/updater';
   import logo from './assets/sflink-logo.svg';
   import type { Entry, Listing, Shortcut, Device, Side, Transfer } from './lib/types';
@@ -150,9 +151,11 @@
     if (['ArrowDown','ArrowUp','Home','End'].includes(event.key)) { event.preventDefault(); buttons[event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus(); }
     if (event.key === 'Tab' || event.key === 'Escape') contextMenu = null;
   }
-  async function openLocal(path: string, name: string) {
+  async function openLocal(path: string, name: string): Promise<boolean> {
+    if (!await invoke<boolean>('local_readable', { path })) return false;
     if (/\.(jpe?g|png|webp|gif|bmp|mp3|m4a|flac|wav|ogg|aac|opus|mp4|webm|m4v|mov)$/i.test(name)) { mediaRequest++; media = { path, name, playlist: [...local.entries.filter(e => !e.isDir && /\.(mp3|flac|m4a|wav|ogg|aac|opus|mp4|webm|m4v|mov)$/i.test(e.name)).map(e => ({ path: e.path, name: e.name })), ...(!local.entries.some(e => e.path === path) ? [{ path, name }] : [])] }; }
-    else { try { await invoke('local_open', { path }); } catch (error) { notify(String(error)); } }
+    else { try { await invoke('local_open', { path }); } catch (error) { notify(String(error)); return false; } }
+    return true;
   }
   async function chooseLocal() {
     if (!desktop) return;
@@ -175,14 +178,28 @@
     if (side === 'local') localSelected = next; else remoteSelected = next;
   }
 
+  const openingRemote = new Set<string>();
   async function openEntry(side: Side, entry: Entry) {
-    if (entry.isDir) await load(side, entry.path);
-    else if (side === 'local') await openLocal(entry.path, entry.name);
-    else {
-      if (transfers.some(t => t.openAfter && t.source === entry.path && ['queued', 'running'].includes(t.status))) { notify('Este arquivo já está sendo baixado para abrir.'); return; }
+    if (entry.isDir) { await load(side, entry.path); return; }
+    if (side === 'local') { if (!await openLocal(entry.path, entry.name)) notify('O arquivo não está disponível para leitura. Atualize a pasta.'); return; }
+    if (openingRemote.has(entry.path) || transfers.some(t => t.source === entry.path && t.direction === 'download' && ['queued', 'running'].includes(t.status))) { notify('Este arquivo já está sendo preparado ou baixado.'); return; }
+    openingRemote.add(entry.path);
+    try {
+      const existing = await invoke<string | null>('find_download', { source: entry.path, destination: local.path, size: entry.size, modified: entry.modified });
+      if (existing && await openLocal(existing, entry.name)) return;
       if (!local.path) await chooseLocal();
       if (local.path) { enqueue('remote', [entry], true); notify(`Baixando ${entry.name}. O arquivo abrirá ao concluir.`); }
-    }
+    } catch (error) { notify(String(error)); }
+    finally { openingRemote.delete(entry.path); }
+  }
+  async function openTransfer(item: Transfer) {
+    if (item.status !== 'done') return;
+    const path = item.direction === 'upload' ? item.source : item.localPath;
+    if (path && await openLocal(path, item.name)) return;
+    if (item.direction === 'download') {
+      if (!device) { notify('O arquivo local não existe mais. Conecte o celular para baixá-lo novamente.'); return; }
+      await openEntry('remote', { path: item.source, name: item.name, isDir: false, size: item.total, modified: item.modified ?? null });
+    } else notify('O arquivo enviado não está mais disponível no PC.');
   }
   function showModal(type: typeof modal, side: Side = 'local') {
     if (quickConnecting) { notify('Aguarde a conexão rápida terminar.'); return; }
@@ -230,7 +247,7 @@
     if (files.length < selection.length) notify('Nesta primeira versão, selecione os arquivos dentro da pasta para transferir.');
     const destination = side === 'local' ? remote.path : local.path;
     if (!destination) { notify('Abra uma pasta de destino primeiro.'); return; }
-    transfers = [...transfers, ...files.map(file => ({ id: crypto.randomUUID(), openAfter, name: file.name, source: file.path, destination, direction: side === 'local' ? 'upload' as const : 'download' as const, total: file.size, transferred: 0, status: 'queued' as const }))];
+    transfers = [...transfers, ...files.map(file => ({ id: crypto.randomUUID(), openAfter, modified: file.modified, name: file.name, source: file.path, destination, direction: side === 'local' ? 'upload' as const : 'download' as const, total: file.size, transferred: 0, status: 'queued' as const }))];
     queueOpen = true; void runQueue();
   }
   function updateTransfer(id: string, patch: Partial<Transfer>) { transfers = transfers.map(t => t.id === id ? { ...t, ...patch } : t); }
@@ -243,8 +260,8 @@
         if (!next) break;
         updateTransfer(next.id, { status: 'running' });
         try {
-          const downloadedPath = await invoke<string | null>('transfer_file', { id: next.id, direction: next.direction, source: next.source, destination: next.destination, openAfter: !!next.openAfter });
-          updateTransfer(next.id, { status: 'done', transferred: transfers.find(t => t.id === next.id)?.total || next.total });
+          const downloadedPath = await invoke<string | null>('transfer_file', { id: next.id, direction: next.direction, source: next.source, destination: next.destination, openAfter: !!next.openAfter, modified: next.modified ?? null });
+          updateTransfer(next.id, { status: 'done', localPath: downloadedPath || (next.direction === 'upload' ? next.source : undefined), transferred: transfers.find(t => t.id === next.id)?.total || next.total });
           if (next.openAfter && downloadedPath) await openLocal(downloadedPath, next.name);
           const side = next.direction === 'upload' ? 'remote' : 'local';
           if (device && next.destination === (side === 'local' ? local.path : remote.path)) await load(side, next.destination);
@@ -372,7 +389,7 @@
         <header><button class="queue-heading" on:click={() => queueOpen = !queueOpen}><ArrowDownUp size={20}/><h2>Transferências</h2>{#if activeTransfers.length}<span class="queue-count">{activeTransfers.length}</span>{/if}<ChevronDown size={17} class={queueOpen ? 'rotate' : ''}/></button>{#if transfers.some(t => !['queued', 'running'].includes(t.status))}<button class="text-button" on:click={() => transfers = transfers.filter(t => ['queued', 'running'].includes(t.status))}>Limpar concluídas</button>{/if}</header>
         {#if queueOpen || section === 'Transferências'}
           {#if !transfers.length}<div class="queue-empty"><div class="queue-icon"><ArrowUpRight size={23}/></div><div><strong>Tudo pronto para transferir</strong><p>Conecte o celular e arraste os arquivos entre os painéis.</p></div><span class="queue-empty-status">Nenhuma transferência</span></div>
-          {:else}<div class="queue-list">{#each transfers as transfer (transfer.id)}<div class="transfer-row"><div class="transfer-direction" class:complete={transfer.status === 'done'}>{#if transfer.status === 'done'}<Check size={21}/>{:else if transfer.direction === 'upload'}<Upload size={21}/>{:else}<Download size={21}/>{/if}</div><div class="transfer-details"><strong>{transfer.name}</strong><span>{transfer.status === 'done' ? `Concluído · ${bytes(transfer.total)}` : transfer.status === 'queued' ? 'Na fila' : transfer.status === 'cancelled' ? 'Cancelado' : transfer.status === 'error' ? transfer.error : `${transfer.direction === 'upload' ? 'Enviando' : 'Baixando'} · ${bytes(transfer.transferred)} de ${bytes(transfer.total)}`}</span>{#if transfer.status === 'running'}<div class="progress-track"><div style={`width:${progress}%`}></div></div>{/if}</div>{#if transfer.status === 'running'}<span class="progress-label">{progress}%</span>{/if}{#if ['queued', 'running'].includes(transfer.status)}<button class="icon-button" title="Cancelar transferência" aria-label={`Cancelar ${transfer.name}`} on:click={() => void cancel(transfer.id)}><X size={17}/></button>{:else if transfer.status === 'error' && device}<button class="icon-button" title="Tentar novamente" aria-label={`Tentar novamente ${transfer.name}`} on:click={() => { updateTransfer(transfer.id, { status: 'queued', transferred: 0, error: undefined }); void runQueue(); }}><RefreshCw size={16}/></button>{/if}</div>{/each}</div>{/if}
+          {:else}<div class="queue-list">{#each transfers as transfer (transfer.id)}<div class="transfer-row"><div class="transfer-direction" class:complete={transfer.status === 'done'}>{#if transfer.status === 'done'}<Check size={21}/>{:else if transfer.direction === 'upload'}<Upload size={21}/>{:else}<Download size={21}/>{/if}</div><button class="transfer-open" disabled={transfer.status !== 'done'} aria-label={`Abrir ${transfer.name}`} title={transfer.status === 'done' ? 'Abrir arquivo' : 'Aguarde a transferência terminar'} on:click={() => void openTransfer(transfer)}>{#if /\.(jpe?g|png|webp|mp3|flac|m4a|wav|ogg|aac|opus)$/i.test(transfer.name)}{#key `${transfer.id}:${transfer.localPath || ''}`}<PhotoThumbnail side={transfer.direction === 'upload' || transfer.localPath ? 'local' : 'remote'} path={transfer.localPath || transfer.source} audio={/\.(mp3|flac|m4a|wav|ogg|aac|opus)$/i.test(transfer.name)}/>{/key}{:else}<span class="transfer-file-symbol"><FileText size={24}/></span>{/if}<span class="transfer-details"><strong>{transfer.name}</strong><span>{transfer.status === 'done' ? `Concluído · ${bytes(transfer.total)}` : transfer.status === 'queued' ? 'Na fila' : transfer.status === 'cancelled' ? 'Cancelado' : transfer.status === 'error' ? transfer.error : `${transfer.direction === 'upload' ? 'Enviando' : 'Baixando'} · ${bytes(transfer.transferred)} de ${bytes(transfer.total)}`}</span>{#if transfer.status === 'running'}<span class="progress-track"><span style={`width:${progress}%`}></span></span>{/if}</span></button>{#if transfer.status === 'running'}<span class="progress-label">{progress}%</span>{/if}{#if ['queued', 'running'].includes(transfer.status)}<button class="icon-button" title="Cancelar transferência" aria-label={`Cancelar ${transfer.name}`} on:click={() => void cancel(transfer.id)}><X size={17}/></button>{:else if transfer.status === 'error' && device}<button class="icon-button" title="Tentar novamente" aria-label={`Tentar novamente ${transfer.name}`} on:click={() => { updateTransfer(transfer.id, { status: 'queued', transferred: 0, error: undefined }); void runQueue(); }}><RefreshCw size={16}/></button>{/if}</div>{/each}</div>{/if}
         {/if}
       </section>
     {/if}
@@ -407,3 +424,7 @@
     <button role="menuitem" on:click={() => contextAction('mkdir')}><Plus size={16}/>Nova pasta</button><button role="menuitem" on:click={() => contextAction('select-all')}>Selecionar tudo <kbd>Ctrl+A</kbd></button><button role="menuitem" on:click={() => contextAction('refresh')}><RefreshCw size={16}/>Atualizar <kbd>F5</kbd></button>
   </div>
 {/if}
+
+<style>
+  .transfer-open{display:flex;align-items:center;gap:14px;flex:1;min-width:0;text-align:left;padding:0;color:inherit;border-radius:8px}.transfer-open:disabled{opacity:1;cursor:default}.transfer-open:not(:disabled):hover strong{text-decoration:underline;color:var(--accent)}.transfer-open .transfer-details{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}.transfer-open .transfer-details>strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.transfer-file-symbol{width:34px;display:grid;place-items:center;color:var(--muted);flex-shrink:0}.transfer-open .progress-track{display:block}.transfer-open .progress-track>span{display:block;height:100%;background:var(--accent)}
+</style>

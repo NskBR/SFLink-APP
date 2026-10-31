@@ -143,8 +143,10 @@ async fn prepare_install(app: &AppHandle, installer: &std::path::Path, hash: &st
     let destination = executable.parent().ok_or("Pasta do aplicativo inválida.")?;
     let ready = folder.join("ready"); let go = folder.join("go"); let error = folder.join("error");
     let script = folder.join("install.ps1"); let config = folder.join("config.json");
+    let logo = folder.join("logo.png");
+    std::fs::write(&logo, include_bytes!("../icons/128x128.png")).map_err(|e| e.to_string())?;
     std::fs::write(&script, format!("\u{feff}{}", include_str!("update-helper.ps1"))).map_err(|e| e.to_string())?;
-    let data = serde_json::json!({ "installer": installer, "sha256": hash, "parent": std::process::id(), "parentStart": parent_start_ticks()?, "destination": destination, "executable": destination.join("wifi-files.exe"), "ready": ready, "go": go, "error": error });
+    let data = serde_json::json!({ "installer": installer, "sha256": hash, "logo": logo, "parent": std::process::id(), "parentStart": parent_start_ticks()?, "destination": destination, "executable": destination.join("wifi-files.exe"), "ready": ready, "go": go, "error": error });
     std::fs::write(&config, serde_json::to_vec(&data).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     let mut command = std::process::Command::new("powershell.exe");
     command.args(["-NoProfile", "-STA", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File"]).arg(&script).arg("-ConfigPath").arg(&config);

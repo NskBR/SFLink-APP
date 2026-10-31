@@ -10,6 +10,7 @@ use tauri::{AppHandle, Emitter, State, Manager};
 use tauri_plugin_opener::OpenerExt;
 use tokio::io::AsyncWriteExt;
 use tokio_util::{io::ReaderStream, sync::CancellationToken};
+mod downloads;
 mod previews;
 mod updater;
 mod remembered;
@@ -122,6 +123,7 @@ async fn read_pairing(path: String) -> Result<PairingDocument, String> {
 }
 #[derive(Clone)]
 struct Remote {
+    identity: String,
     client: reqwest::Client,
     base: reqwest::Url,
     token: String,
@@ -292,6 +294,10 @@ fn remote(state: &AppState) -> Result<Remote, String> {
         .clone()
         .ok_or("Conecte um celular primeiro.".into())
 }
+fn certificate_identity(bytes: &[u8]) -> String {
+    use sha2::Digest;
+    format!("{:x}", sha2::Sha256::digest(bytes.iter().copied().filter(|b| !b.is_ascii_whitespace()).collect::<Vec<_>>()))
+}
 impl Remote {
     fn url(&self, endpoint: &str) -> Result<reqwest::Url, String> {
         self.base.join(endpoint).map_err(err)
@@ -343,22 +349,26 @@ async fn connect_device(
         return Err("Informe o código de acesso do celular.".into());
     }
     base.set_path("/");
+    let mut identity = base.to_string();
     let mut builder = reqwest::Client::builder()
         .no_proxy()
         .connect_timeout(Duration::from_secs(8))
         .redirect(reqwest::redirect::Policy::none());
     if let Some(pem) = certificate_pem.filter(|pem| !pem.is_empty()) {
+        identity = certificate_identity(pem.as_bytes());
         let cert = reqwest::Certificate::from_pem(pem.as_bytes())
             .map_err(|_| "Certificado da conexão inválido.".to_string())?;
         builder = builder.add_root_certificate(cert);
     }
     if let Some(path) = certificate_path.filter(|p| !p.is_empty()) {
         let bytes = tokio::fs::read(path).await.map_err(err)?;
+        identity = certificate_identity(&bytes);
         let cert = reqwest::Certificate::from_pem(&bytes)
             .map_err(|_| "Certificado PEM inválido.".to_string())?;
         builder = builder.add_root_certificate(cert);
     }
     let candidate = Remote {
+        identity,
         client: builder.build().map_err(err)?,
         base,
         token: token.trim().into(),
@@ -594,6 +604,7 @@ async fn transfer_file(
     source: String,
     destination: String,
     open_after: Option<bool>,
+    modified: Option<u64>,
 ) -> Result<Option<String>, String> {
     let remote = remote(&state)?;
     let target_name = if open_after == Some(true) && direction == "download" { Some(available_download_name(Path::new(&destination), source.rsplit('/').next().ok_or("Nome inválido.")?)?) } else { None };
@@ -606,13 +617,19 @@ async fn transfer_file(
         }
         map.insert(id.clone(), cancel.clone());
     }
+    let progress_app = app.clone();
     let result = tokio::select! {
         _ = cancel.cancelled() => Err("Transferência cancelada.".into()),
-        result = transfer_with_name(move |progress| { let _ = app.emit("transfer-progress", progress); }, &remote, &id, &direction, &source, &destination, target_name.as_deref()) => result,
+        result = transfer_with_name(move |progress| { let _ = progress_app.emit("transfer-progress", progress); }, &remote, &id, &direction, &source, &destination, target_name.as_deref()) => result,
     };
     state.transfers.lock().map_err(err)?.remove(&id);
     result?;
-    Ok(target_name.map(|name| Path::new(&destination).join(name).to_string_lossy().into_owned()))
+    if direction == "download" {
+        let name = target_name.as_deref().or_else(|| source.rsplit('/').next()).ok_or("Nome inválido.")?;
+        let path = Path::new(&destination).join(name);
+        let _ = downloads::remember(&app, &remote.identity, &source, &path, modified);
+        Ok(Some(path.to_string_lossy().into_owned()))
+    } else { Ok(None) }
 }
 fn available_download_name(parent: &Path, name: &str) -> Result<String, String> {
     valid_name(name)?;
@@ -761,6 +778,8 @@ pub fn run() {
             local_rename,
             local_trash,
             local_open,
+            downloads::find_download,
+            downloads::local_readable,
             previews::image_thumbnail,
             previews::prepare_media,
             previews::audio_metadata,
@@ -820,6 +839,7 @@ mod tests {
             std::fs::write(path, serde_json::to_string(&document).unwrap()).unwrap();
         }
         let remote = Remote {
+            identity: "test-device".into(),
             client: reqwest::Client::builder()
                 .tls_built_in_root_certs(false)
                 .add_root_certificate(
@@ -853,6 +873,7 @@ mod tests {
             assert_eq!(qr.certificate_pem, pairing.certificate_pem);
         }
         let remote = Remote {
+            identity: "test-device".into(),
             client: reqwest::Client::builder()
                 .add_root_certificate(
                     reqwest::Certificate::from_pem(pairing.certificate_pem.as_bytes()).unwrap(),
@@ -1002,6 +1023,7 @@ mod tests {
             .unwrap();
         (
             Remote {
+            identity: "test-device".into(),
                 client,
                 base: reqwest::Url::parse(&format!("https://localhost:{port}/")).unwrap(),
                 token: "test-only-token".into(),

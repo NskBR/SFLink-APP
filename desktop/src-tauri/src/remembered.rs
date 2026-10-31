@@ -160,6 +160,7 @@ fn base(address: &str) -> Result<reqwest::Url, String> {
 }
 fn candidate(saved: &Saved, address: &str) -> Result<Remote, String> {
     Ok(Remote {
+        identity: super::certificate_identity(saved.certificate.as_bytes()),
         base: base(address)?,
         token: saved.token.clone(),
         client: reqwest::Client::builder()

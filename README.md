@@ -11,7 +11,7 @@ Gerenciador de arquivos entre Windows e Android pela rede Wi-Fi. Explore as past
 - “Lembrar dispositivo” autoriza reconexão sem repetir o código. Revogação disponível no Android.
 - Atualizador pelo GitHub Releases, com conferência de tamanho/SHA-256 e confirmação de instalação.
 
-Desktop: **0.7.0** · Android: **0.3.0**. [Baixe a release desktop](https://github.com/NskBR/SFLink-APP/releases/tag/v0.7.0) ou o [APK Android 0.3.0](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
+Desktop: **0.8.0** · Android: **0.3.0**. [Baixe a release desktop](https://github.com/NskBR/SFLink-APP/releases/tag/v0.8.0) ou o [APK Android 0.3.0](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
 
 ## Capturas de demonstração
 
@@ -71,3 +71,9 @@ O botão Atualizar fica na titlebar. A primeira consulta automática é feita 10
 O player passa a seguir o layout vertical: capa grande (até 512 px), nome e autor centralizados, barra de posição, tempos e controles abaixo. O volume fica num botão que abre o ajuste. O tamanho se adapta à altura da janela sem barras de rolagem. Vídeos MP4/WebM/M4V/MOV compatíveis com os codecs do Windows abrem no mesmo player, na área superior; arquivos do celular continuam sendo baixados para a pasta do PC antes de abrir.
 
 A titlebar não exibe mais um botão de consulta permanente. Atualizar aparece somente quando uma versão mais nova for encontrada, ou enquanto o download/instalação solicitado estiver em andamento. O agendamento de 10 segundos e consultas a cada 60 segundos foi mantido, sem download automático. A consulta manual continua disponível em Configurações → Atualizações.
+
+## Downloads já existentes e histórico clicável (0.8.0)
+
+O duplo clique procura uma cópia local já baixada antes de criar outra transferência. As novas cópias são registradas por identidade do celular, caminho remoto, tamanho e data, com verificação de leitura do arquivo local. O registro dura entre sessões e não armazena tokens. Se a cópia for removida, ficar inacessível ou mudar, o app permite baixar novamente sem substituir um arquivo existente. Para downloads de versões antigas ainda não registrados, a migração usa nome e tamanho na pasta aberta do PC; isso é uma heurística, não uma comparação de conteúdo por hash. Cópias conhecidas de outro dispositivo ou versão de arquivo não são adotadas por essa heurística.
+
+A lista de transferências mostra miniaturas e permite abrir os arquivos concluídos. Downloads abrem a cópia local; envios abrem o arquivo de origem no PC. Se uma cópia de download desaparecer, clicar na transferência oferece o mesmo fluxo de baixar novamente, com o celular conectado. O splash de atualização recebeu fundo transparente, cantos externos arredondados e identidade visual SFLink. O novo splash só é utilizado por atualizações iniciadas na 0.8.0 ou posterior.

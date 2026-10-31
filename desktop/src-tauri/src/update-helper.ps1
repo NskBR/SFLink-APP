@@ -4,10 +4,10 @@ $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom
 try {
     Add-Type -AssemblyName PresentationFramework
     [xml]$markup = @'
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Width="420" Height="290" WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="NoResize" Background="#0D1116" Foreground="#E4EDF2" FontFamily="Segoe UI" Title="Atualizando SFLink">
- <Border BorderBrush="#234438" BorderThickness="1" Padding="32">
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Width="420" SizeToContent="Height" MinHeight="290" WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent" Foreground="#E4EDF2" FontFamily="Segoe UI" Title="Atualizando SFLink">
+ <Border Background="#0D1116" CornerRadius="24" BorderBrush="#234438" BorderThickness="1" Padding="32">
   <StackPanel>
-   <TextBlock Text="SFLink" Foreground="#20E3AD" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,25"/>
+   <StackPanel Orientation="Horizontal" Margin="0,0,0,25"><Image Name="Logo" Width="42" Height="42" Margin="0,0,13,0"/><StackPanel VerticalAlignment="Center"><TextBlock Text="SFLink" Foreground="#20E3AD" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Atualização do aplicativo" Foreground="#91A1B5" FontSize="11" Margin="0,3,0,0"/></StackPanel></StackPanel>
    <TextBlock Name="Status" Text="Preparando atualização…" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
    <TextBlock Name="Detail" Text="Seus arquivos e dispositivos serão preservados." FontSize="12" Foreground="#91A1B5" TextWrapping="Wrap" Margin="0,12,0,24"/>
    <ProgressBar Name="Progress" IsIndeterminate="True" Height="4" Foreground="#20E3AD" Background="#1D3029" BorderThickness="0"/>
@@ -17,6 +17,7 @@ try {
 </Window>
 '@
     $window = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader $markup))
+    if ($config.logo) { $window.FindName('Logo').Source = [Windows.Media.Imaging.BitmapFrame]::Create([Uri]::new($config.logo)) }
     $status = $window.FindName('Status'); $detail = $window.FindName('Detail')
     $progress = $window.FindName('Progress'); $close = $window.FindName('Close')
     $close.Add_Click({ $window.Close() })

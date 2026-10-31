@@ -41,3 +41,9 @@ Validação de interface com relógio controlado: zero consultas antes de 10 seg
 Interface validada com IPC simulado, áudio WAV e vídeo MP4 reais de teste. O player não apresentou transbordamento horizontal/vertical nem conteúdo fora da área da janela em 1500×1000 e 1050×640. Testados reprodução, volume por botão, seek, anterior/próxima, aleatório, repetição e abertura de vídeo. Fotos sem caixa foram preservadas.
 
 Titlebar: zero botões Atualizar antes da primeira consulta e após uma consulta que não encontrou nova versão; botão presente quando a consulta encontrou atualização, com download/instalação somente após clique. Mantidos os testes de consultas aos 10/70 segundos sem download automático, menu de contexto, temas e histórico do mouse. Esses testes não substituem uma validação em celular físico/codecs dos arquivos do usuário.
+
+## Desktop 0.8.0
+
+Backend: testes para persistência do índice de cópias locais, exclusão do arquivo, verificação de tamanho/leitura e não reutilização de cópias conhecidas de outra identidade/versão remota. Interface com IPC simulado: segundo duplo clique não cria outra transferência, cópia removida é baixada novamente, linhas concluídas abrem o arquivo e mostram miniatura. Regressões de player, vídeo, menus, temas e consultas de atualização continuaram passando.
+
+O auxiliar com transparência e Border.CornerRadius=24 passou novamente no teste isolado de SHA inválido, handshake, parâmetros silenciosos e reabertura. A instalação real do usuário não foi substituída por esse teste.
