@@ -4,7 +4,7 @@
   import { bytes } from './lib/types';
 </script>
 <div class="update-card">
-  <div><h3>Atualizações do SFLink</h3><p>Versão 0.6.0 · GitHub Releases</p></div>
+  <div><h3>Atualizações do SFLink</h3><p>Versão 0.7.0 · GitHub Releases</p></div>
   <p>A primeira consulta ocorre após 10 segundos. Depois, a cada 60 segundos. O download e a instalação só começam quando você clicar em Atualizar.</p>
   {#if $updates.info?.available}<strong>Versão {$updates.info.version} disponível</strong>{#if $updates.info.notes}<p class="release-notes">{$updates.info.notes}</p>{/if}{/if}
   {#if $updates.downloading}<progress max={$updates.total || 1} value={$updates.downloaded}></progress><p>{bytes($updates.downloaded)} de {bytes($updates.total)}</p>{/if}

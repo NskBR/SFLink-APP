@@ -37,11 +37,13 @@
   <!-- Tauri's drag region also handles native double-click maximize/restore. -->
   <div class="window-drag-region" data-tauri-drag-region>
   </div>
+  {#if $updates.info?.available || $updates.ready || $updates.downloading || $updates.installing}
   <button class="title-update" class:available={$updates.info?.available || $updates.ready} aria-label={$updates.downloading ? 'Baixando atualização' : $updates.installing ? 'Instalando atualização' : $updates.info?.available ? `Atualizar para ${$updates.info.version}` : 'Verificar e atualizar SFLink'} title={$updates.transferring ? 'Aguarde as transferências terminarem' : $updates.error || ($updates.info?.available ? `SFLink ${$updates.info.version} disponível — clique para atualizar` : $updates.message || 'Verificar e atualizar SFLink')} disabled={!desktop || $updates.checking || $updates.downloading || $updates.installing || $updates.transferring} on:click={() => void applyUpdate()}>
     {#if $updates.checking || $updates.downloading || $updates.installing}<LoaderCircle size={14} class="spin"/>{:else}<Download size={14}/>{/if}
     <span>{$updates.downloading ? `${$updates.total ? Math.round($updates.downloaded / $updates.total * 100) : 0}%` : $updates.installing ? 'Atualizando…' : 'Atualizar'}</span>
     {#if $updates.info?.available && !$updates.downloading && !$updates.installing}<span class="update-dot"></span>{/if}
   </button>
+  {/if}
   <div class="window-controls" aria-label="Controles da janela">
     <button aria-label="Minimizar janela" title="Minimizar" disabled={!desktop} on:click={() => void action('minimize')}><Minus size={14}/></button>
     <button aria-label={maximized ? 'Restaurar janela' : 'Maximizar janela'} title={maximized ? 'Restaurar' : 'Maximizar'} disabled={!desktop} on:click={() => void action('maximize')}>{#if maximized}<Copy size={12}/>{:else}<Square size={12}/>{/if}</button>

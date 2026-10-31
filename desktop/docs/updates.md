@@ -51,3 +51,5 @@ Referências: [GitHub Releases API](https://docs.github.com/en/rest/releases/rel
 ## Consultas e ação explícita — 0.6.0
 
 O agendamento é centralizado para que titlebar e Configurações compartilhem o mesmo estado: primeira consulta após 10 segundos, seguintes a cada 60 segundos. Consultas periódicas só atualizam a indicação de disponibilidade; nunca iniciam download/instalação. Clicar em Atualizar na titlebar inicia download e depois instalação. Verificar agora em Configurações é somente consulta. Temporizadores e assinatura de progresso são removidos ao desmontar o app; verificações não se sobrepõem a download, preparação de instalação ou download já pronto.
+
+Na 0.7.0, o botão da titlebar fica oculto até a consulta encontrar nova versão. Durante uma atualização solicitada, ele mostra o progresso. Configurações mantém a opção Verificar agora para consulta manual.

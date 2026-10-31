@@ -151,7 +151,7 @@
     if (event.key === 'Tab' || event.key === 'Escape') contextMenu = null;
   }
   async function openLocal(path: string, name: string) {
-    if (/\.(jpe?g|png|webp|gif|bmp|mp3|m4a|flac|wav|ogg|aac|opus)$/i.test(name)) { mediaRequest++; media = { path, name, playlist: [...local.entries.filter(e => !e.isDir && /\.(mp3|flac|m4a|wav|ogg|aac|opus)$/i.test(e.name)).map(e => ({ path: e.path, name: e.name })), ...(!local.entries.some(e => e.path === path) ? [{ path, name }] : [])] }; }
+    if (/\.(jpe?g|png|webp|gif|bmp|mp3|m4a|flac|wav|ogg|aac|opus|mp4|webm|m4v|mov)$/i.test(name)) { mediaRequest++; media = { path, name, playlist: [...local.entries.filter(e => !e.isDir && /\.(mp3|flac|m4a|wav|ogg|aac|opus|mp4|webm|m4v|mov)$/i.test(e.name)).map(e => ({ path: e.path, name: e.name })), ...(!local.entries.some(e => e.path === path) ? [{ path, name }] : [])] }; }
     else { try { await invoke('local_open', { path }); } catch (error) { notify(String(error)); } }
   }
   async function chooseLocal() {

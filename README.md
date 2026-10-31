@@ -11,7 +11,7 @@ Gerenciador de arquivos entre Windows e Android pela rede Wi-Fi. Explore as past
 - “Lembrar dispositivo” autoriza reconexão sem repetir o código. Revogação disponível no Android.
 - Atualizador pelo GitHub Releases, com conferência de tamanho/SHA-256 e confirmação de instalação.
 
-Desktop: **0.6.0** · Android: **0.3.0**. [Baixe a release desktop](https://github.com/NskBR/SFLink-APP/releases/tag/v0.6.0) ou o [APK Android 0.3.0](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
+Desktop: **0.7.0** · Android: **0.3.0**. [Baixe a release desktop](https://github.com/NskBR/SFLink-APP/releases/tag/v0.7.0) ou o [APK Android 0.3.0](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
 
 ## Capturas de demonstração
 
@@ -65,3 +65,9 @@ A partir da 0.5.0, Baixar e atualizar verifica o instalador, abre um splash, fec
 Player grafite inspirado na referência, com título/artista das tags, capa, reprodução/pausa central, duração, posição e volume. Anterior/próxima percorrem as músicas disponíveis na pasta local do PC; aleatório e repetição controlam essa lista. Fotos abrem diretamente sobre a sobreposição escura, sem caixa, com fechamento por Escape ou clique fora.
 
 O botão Atualizar fica na titlebar. A primeira consulta automática é feita 10 segundos após abrir o app e as seguintes a cada 60 segundos (10, 70, 130…). As consultas não baixam nem instalam nada. Só clicar em Atualizar ou Baixar e atualizar inicia o download verificado e depois a instalação/reabertura com splash. Verificar agora em Configurações consulta sem instalar. A fila deve terminar antes da instalação. Enquanto há download/instalação em curso, novas consultas não concorrem com essa operação.
+
+## Player vertical e botão de atualização (0.7.0)
+
+O player passa a seguir o layout vertical: capa grande (até 512 px), nome e autor centralizados, barra de posição, tempos e controles abaixo. O volume fica num botão que abre o ajuste. O tamanho se adapta à altura da janela sem barras de rolagem. Vídeos MP4/WebM/M4V/MOV compatíveis com os codecs do Windows abrem no mesmo player, na área superior; arquivos do celular continuam sendo baixados para a pasta do PC antes de abrir.
+
+A titlebar não exibe mais um botão de consulta permanente. Atualizar aparece somente quando uma versão mais nova for encontrada, ou enquanto o download/instalação solicitado estiver em andamento. O agendamento de 10 segundos e consultas a cada 60 segundos foi mantido, sem download automático. A consulta manual continua disponível em Configurações → Atualizações.

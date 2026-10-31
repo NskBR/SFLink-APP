@@ -35,3 +35,9 @@ Build frontend sem erros/avisos. Treze testes Rust passaram (quatro testes de co
 Validação de interface com relógio controlado: zero consultas antes de 10 segundos, primeira aos 10, segunda aos 70, e nenhuma chamada de download/instalação após essas consultas mesmo com versão disponível. O clique explícito na titlebar chama download e depois instalação, nessa ordem. O teste usa IPC simulado e não executa instalador real.
 
 Áudio de teste real: reprodução/pausa, seek, volume, anterior/próxima, aleatório e repetição passaram na interface. Fotos carregam com superfície transparente, sem caixa de fundo. Persistência de temas, navegação por mouse e menus continuaram passando. Essas verificações não substituem o uso com os arquivos/codecs do usuário e celular físico.
+
+## Desktop 0.7.0
+
+Interface validada com IPC simulado, áudio WAV e vídeo MP4 reais de teste. O player não apresentou transbordamento horizontal/vertical nem conteúdo fora da área da janela em 1500×1000 e 1050×640. Testados reprodução, volume por botão, seek, anterior/próxima, aleatório, repetição e abertura de vídeo. Fotos sem caixa foram preservadas.
+
+Titlebar: zero botões Atualizar antes da primeira consulta e após uma consulta que não encontrou nova versão; botão presente quando a consulta encontrou atualização, com download/instalação somente após clique. Mantidos os testes de consultas aos 10/70 segundos sem download automático, menu de contexto, temas e histórico do mouse. Esses testes não substituem uma validação em celular físico/codecs dos arquivos do usuário.

@@ -9,20 +9,22 @@ const MAX_BYTES: usize = 24 * 1024 * 1024;
 pub struct PreviewJobs(Arc<Semaphore>);
 impl Default for PreviewJobs { fn default() -> Self { Self(Arc::new(Semaphore::new(2))) } }
 
-pub(crate) fn thumbnail(bytes: Vec<u8>) -> Result<String, String> {
+#[cfg(test)]
+fn thumbnail(bytes: Vec<u8>) -> Result<String, String> { thumbnail_at(bytes, 96) }
+fn thumbnail_at(bytes: Vec<u8>, edge: u32) -> Result<String, String> {
     if bytes.len() > MAX_BYTES { return Err("Imagem grande demais para miniatura.".into()); }
     let mut reader = image::ImageReader::new(Cursor::new(bytes)).with_guessed_format().map_err(err)?;
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(8192); limits.max_image_height = Some(8192); limits.max_alloc = Some(64 * 1024 * 1024);
     reader.limits(limits);
-    let image = reader.decode().map_err(err)?.thumbnail(96, 96);
+    let image = reader.decode().map_err(err)?.thumbnail(edge, edge);
     let mut output = Cursor::new(Vec::new());
     image.write_to(&mut output, image::ImageFormat::Png).map_err(err)?;
     Ok(format!("data:image/png;base64,{}", STANDARD.encode(output.into_inner())))
 }
 
 #[tauri::command]
-pub async fn image_thumbnail(state: State<'_, AppState>, jobs: State<'_, PreviewJobs>, side: String, path: String) -> Result<String, String> {
+pub async fn image_thumbnail(state: State<'_, AppState>, jobs: State<'_, PreviewJobs>, side: String, path: String, large: Option<bool>) -> Result<String, String> {
     let _permit = jobs.0.clone().acquire_owned().await.map_err(err)?;
     let extension = std::path::Path::new(&path).extension().and_then(|s| s.to_str()).unwrap_or("").to_ascii_lowercase();
     if !["jpg", "jpeg", "png", "webp", "mp3", "flac", "m4a", "ogg", "opus", "wav", "aac"].contains(&extension.as_str()) { return Err("Formato sem miniatura.".into()); }
@@ -39,9 +41,10 @@ pub async fn image_thumbnail(state: State<'_, AppState>, jobs: State<'_, Preview
         use tokio::io::AsyncReadExt;
         let mut bytes = Vec::new(); file.take(MAX_BYTES as u64 + 1).read_to_end(&mut bytes).await.map_err(err)?; bytes
     } else { return Err("Painel inválido.".into()); };
+    let edge = if large == Some(true) { 512 } else { 96 };
     // Only the small decoded preview is returned. Nothing is cached on disk.
     tokio::task::spawn_blocking(move || {
-        if ["jpg", "jpeg", "png", "webp"].contains(&extension.as_str()) { thumbnail(bytes) } else { audio_cover(Cursor::new(bytes)) }
+        if ["jpg", "jpeg", "png", "webp"].contains(&extension.as_str()) { thumbnail_at(bytes, edge) } else { audio_cover_at(Cursor::new(bytes), edge) }
     }).await.map_err(err)?
 }
 
@@ -72,18 +75,20 @@ pub async fn image_thumbnail(state: State<'_, AppState>, jobs: State<'_, Preview
     }
 }
 
-pub(crate) fn audio_cover<R: std::io::Read + std::io::Seek>(reader: R) -> Result<String, String> {
+#[cfg(test)]
+fn audio_cover<R: std::io::Read + std::io::Seek>(reader: R) -> Result<String, String> { audio_cover_at(reader, 96) }
+fn audio_cover_at<R: std::io::Read + std::io::Seek>(reader: R, edge: u32) -> Result<String, String> {
     use lofty::{probe::Probe, file::TaggedFileExt};
     let tagged = Probe::new(reader).guess_file_type().map_err(err)?.read().map_err(err)?;
     let picture = tagged.tags().iter().flat_map(|tag| tag.pictures()).next().ok_or("Música sem capa incorporada.")?;
-    thumbnail(picture.data().to_vec())
+    thumbnail_at(picture.data().to_vec(), edge)
 }
 #[tauri::command]
 pub async fn prepare_media(app: tauri::AppHandle, path: String) -> Result<String, String> {
     use tauri::Manager;
     let canonical = std::fs::canonicalize(&path).map_err(err)?;
     let extension = canonical.extension().and_then(|s| s.to_str()).unwrap_or("").to_ascii_lowercase();
-    if !["jpg", "jpeg", "png", "webp", "gif", "bmp", "mp3", "wav", "flac", "m4a", "ogg", "aac", "opus"].contains(&extension.as_str()) || !canonical.is_file() { return Err("Formato não disponível no visualizador.".into()); }
+    if !["jpg", "jpeg", "png", "webp", "gif", "bmp", "mp3", "wav", "flac", "m4a", "ogg", "aac", "opus", "mp4", "webm", "m4v", "mov"].contains(&extension.as_str()) || !canonical.is_file() { return Err("Formato não disponível no visualizador.".into()); }
     app.asset_protocol_scope().allow_file(&canonical).map_err(err)?;
     Ok(canonical.to_string_lossy().into_owned())
 }
