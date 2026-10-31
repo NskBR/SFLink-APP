@@ -22,3 +22,10 @@ O instalador Windows foi compilado localmente a partir dos mesmos arquivos de ex
 ## Desktop 0.4.0
 
 Build frontend sem erros/avisos. Treze testes Rust passaram (quatro testes de conexão manual ignorados). Cobertura adicional: miniatura PNG reduzida, rejeição de dados corrompidos e escolha de nome sem substituir arquivos existentes. Validação de interface com IPC simulado: Ctrl+F no painel ativo, Ctrl+A nos resultados filtrados, Ctrl+Delete com confirmação, F2, duplo clique aguardando o download para abrir, status Enviando/Baixando e carregamento de miniatura. A simulação não substitui a validação dessas novidades com um celular físico. O WebView2 tem os atalhos de navegador desativados nativamente para evitar a busca de página no Ctrl+F.
+
+## Desktop 0.5.0
+
+- Frontend sem erros/avisos; 14 testes Rust passaram, quatro testes manuais de rede ignorados. Novo teste grava uma capa PNG incorporada em tags de áudio e valida sua leitura/redução; dados inválidos são rejeitados.
+- Interface validada com IPC simulado e áudio WAV real servido no ambiente de teste: reprodução/pausa, duração, volume, atalhos, histórico por botões de mouse, menu de renomear, temas e restauração do tema após reload.
+- Auxiliar de atualização executado no Windows com instalador e aplicativo de teste isolados: SHA incorreto rejeitado, handshake ready/go, parâmetros silenciosos, espera por término e reabertura. Esse teste não substitui uma atualização completa de duas instalações reais do SFLink/NSIS e não alterou a instalação do usuário.
+- O teste de interface usa protocolo de assets simulado; a disponibilidade de codecs no Windows/WebView2 deve ser conferida no uso real. Os novos fluxos não foram validados de novo com celular físico.

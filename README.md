@@ -11,7 +11,7 @@ Gerenciador de arquivos entre Windows e Android pela rede Wi-Fi. Explore as past
 - “Lembrar dispositivo” autoriza reconexão sem repetir o código. Revogação disponível no Android.
 - Atualizador pelo GitHub Releases, com conferência de tamanho/SHA-256 e confirmação de instalação.
 
-Desktop: **0.4.0** · Android: **0.3.0**. [Baixe a release desktop](https://github.com/NskBR/SFLink-APP/releases/tag/v0.4.0) ou o [APK Android 0.3.0](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
+Desktop: **0.5.0** · Android: **0.3.0**. [Baixe a release desktop](https://github.com/NskBR/SFLink-APP/releases/tag/v0.5.0) ou o [APK Android 0.3.0](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
 
 ## Capturas de demonstração
 
@@ -48,4 +48,14 @@ Os builds são locais, sem GitHub Actions. O script `tools/build-release.ps1` us
 
 Clique em um painel para ativá-lo. Ctrl+F foca a pesquisa desse painel; Ctrl+A seleciona os resultados visíveis; Delete/Ctrl+Delete abre a confirmação de exclusão; F2 renomeia; F5/Ctrl+R atualiza a pasta; Ctrl+Shift+N cria pasta; Backspace sobe um nível. Em campos de texto, os atalhos de edição continuam funcionando. Shift+clique seleciona um intervalo e Ctrl+clique alterna a seleção.
 
-Dois cliques em arquivo do celular baixa para a pasta aberta no PC e abre no aplicativo padrão do Windows após concluir. Arquivos existentes são preservados, usando um novo nome quando necessário. Não há cache separado. As miniaturas JPG/PNG/WebP são carregadas quando aparecem na lista, ficam apenas em memória e têm limites de tamanho/decodificação. Imagens grandes ou inválidas mantêm o ícone. A fila e as linhas dos arquivos mostram Enviando/Baixando e progresso.
+Dois cliques em arquivo do celular baixa para a pasta aberta no PC e abre fotos e músicas no visualizador interno após concluir; outros tipos continuam abrindo no Windows. Arquivos existentes são preservados, usando um novo nome quando necessário. Não há cache separado. As miniaturas JPG/PNG/WebP são carregadas quando aparecem na lista, ficam apenas em memória e têm limites de tamanho/decodificação. Imagens grandes ou inválidas mantêm o ícone. A fila e as linhas dos arquivos mostram Enviando/Baixando e progresso.
+
+## Visualizador, navegação e personalização (0.5.0)
+
+Fotos abrem em um modal. Músicas abrem no player interno, com capa incorporada (quando presente), reproduzir/pausar, posição, duração e volume. A compatibilidade de áudio depende dos codecs do Windows/WebView2; formatos não reproduzíveis exibem uma mensagem. Arquivos do celular ainda são baixados para a pasta do PC, com progresso, sem cache de mídia separado. No menu de contexto do arquivo local, Abrir no Windows continua disponível.
+
+Os botões laterais do mouse e Alt+Esquerda/Direita navegam pelo histórico do painel. O menu com botão direito oferece abrir, enviar/baixar, renomear, excluir com confirmação, criar pasta, selecionar tudo e atualizar. Configurações organiza Geral, Personalização, Atualizações e Sobre. Temas Esmeralda, Oceano, Ametista e Papel ficam salvos neste PC.
+
+Miniaturas de capa são lidas das tags do arquivo (MP3, M4A, FLAC, OGG e outros formatos reconhecidos), com limites de leitura e decodificação. Músicas sem capa incorporada ou arquivos acima do limite mantêm o ícone; não é feita busca de capa na internet. O visualizador acessa somente arquivos explicitamente abertos, através do protocolo de assets do Tauri, sem permissão global a diretórios. As permissões desses arquivos duram até o app fechar.
+
+A partir da 0.5.0, Baixar e atualizar verifica o instalador, abre um splash, fecha o app, executa o NSIS silenciosamente e reabre o SFLink. A fila deve estar parada. Permissões exigidas pelo Windows continuam sob controle do sistema. Se houver falha, o splash informa o erro; a instalação manual da release continua disponível. Atualizar de versões antigas para 0.5.0 ainda usa o fluxo antigo, pois o atualizador executado é o da versão instalada.

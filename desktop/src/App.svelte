@@ -8,7 +8,8 @@
   import { Wifi, Folder, ArrowDownUp, Smartphone, Settings, Plus, ArrowUpRight, Check, X, LoaderCircle, RefreshCw, Monitor, ChevronDown, ShieldCheck, Upload, Download, CircleHelp, FolderOpen, Home, Music2, Image, FileText } from '@lucide/svelte';
   import FilePane from './FilePane.svelte';
   import TitleBar from './TitleBar.svelte';
-  import UpdatePanel from './UpdatePanel.svelte';
+  import SettingsPanel from './SettingsPanel.svelte';
+  import MediaModal from './MediaModal.svelte';
   import logo from './assets/sflink-logo.svg';
   import type { Entry, Listing, Shortcut, Device, Side, Transfer } from './lib/types';
   import { bytes } from './lib/types';
@@ -18,6 +19,11 @@
   const blank = (): Listing => ({ path: '', parent: null, entries: [] });
   let section = 'Arquivos';
   let activeSide: Side = 'local';
+  let media: { path: string; name: string } | null = null;
+  let mediaRequest = 0;
+  let forwardHistory: Record<Side, string[]> = { local: [], remote: [] };
+  let contextMenu: { side: Side; entry: Entry | null; x: number; y: number } | null = null;
+  let contextElement: HTMLDivElement;
   let localPane: FilePane, remotePane: FilePane;
   let visibleLocal: Entry[] = [], visibleRemote: Entry[] = [];
   let anchors: Record<Side, string> = { local: '', remote: '' };
@@ -89,7 +95,7 @@
   $: progress = running ? running.total ? Math.min(100, Math.round(running.transferred / running.total * 100)) : 0 : 0;
 
   function notify(message: string) { toast = message; clearTimeout(toastTimer); toastTimer = setTimeout(() => toast = '', 6500); }
-  async function load(side: Side, path: string, record = true) {
+  async function load(side: Side, path: string, record = true, direction: 'back' | 'forward' | null = null) {
     if (!desktop || !path) return;
     const version = ++loadVersions[side];
     if (side === 'local') { localLoading = true; localError = ''; localSelected = []; } else { remoteLoading = true; remoteError = ''; remoteSelected = []; }
@@ -97,7 +103,11 @@
       const listing = await invoke<Listing>(side === 'local' ? 'local_list' : 'remote_list', { path });
       if (version !== loadVersions[side]) return;
       const previous = (side === 'local' ? local : remote).path;
-      if (record && previous && previous !== listing.path) history = { ...history, [side]: [...history[side], previous] };
+      if (previous && previous !== listing.path) {
+        if (direction === 'back') { history = { ...history, [side]: history[side].slice(0, -1) }; forwardHistory = { ...forwardHistory, [side]: [...forwardHistory[side], previous] }; }
+        else if (direction === 'forward') { forwardHistory = { ...forwardHistory, [side]: forwardHistory[side].slice(0, -1) }; history = { ...history, [side]: [...history[side], previous] }; }
+        else if (record) { history = { ...history, [side]: [...history[side], previous] }; forwardHistory = { ...forwardHistory, [side]: [] }; }
+      }
       listing.entries.sort((a,b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name, 'pt-BR', { numeric: true }));
       if (side === 'local') local = listing; else remote = listing;
     } catch (error) {
@@ -105,11 +115,42 @@
       if (side === 'local') localError = String(error); else remoteError = String(error);
     } finally { if (version === loadVersions[side]) { if (side === 'local') localLoading = false; else remoteLoading = false; } }
   }
-  function goBack(side: Side) {
-    const path = history[side].at(-1);
-    if (!path) return;
-    history = { ...history, [side]: history[side].slice(0, -1) };
-    void load(side, path, false);
+  function goBack(side: Side) { const path = history[side].at(-1); if (path) void load(side, path, false, 'back'); }
+  function goForward(side: Side) { const path = forwardHistory[side].at(-1); if (path) void load(side, path, false, 'forward'); }
+  function mouseNavigate(event: MouseEvent) {
+    if (event.button !== 3 && event.button !== 4) return;
+    event.preventDefault();
+    if (section !== 'Arquivos' || modal || media || busy) return;
+    const side = (event.target as HTMLElement)?.closest('[data-side]')?.getAttribute('data-side') as Side || activeSide;
+    activeSide = side;
+    if (event.type === 'mouseup') { if (event.button === 3) goBack(side); else goForward(side); }
+  }
+  function showContext(side: Side, entry: Entry | null, event: MouseEvent) {
+    event.preventDefault(); activeSide = side;
+    if (entry && !(side === 'local' ? localSelected : remoteSelected).includes(entry.path)) { if (side === 'local') localSelected = [entry.path]; else remoteSelected = [entry.path]; }
+    if (!entry) { if (side === 'local') localSelected = []; else remoteSelected = []; }
+    contextMenu = { side, entry, x: Math.max(8, Math.min(event.clientX, window.innerWidth - 248)), y: Math.max(8, Math.min(event.clientY, window.innerHeight - 360)) };
+    setTimeout(() => contextElement?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus(), 0);
+  }
+  function contextAction(action: string) {
+    const menu = contextMenu; contextMenu = null; if (!menu) return;
+    const { side, entry } = menu;
+    if (action === 'open' && entry) void openEntry(side, entry);
+    if (action === 'transfer') enqueue(side);
+    if (action === 'rename' || action === 'delete' || action === 'mkdir') showModal(action, side);
+    if (action === 'refresh') void load(side, (side === 'local' ? local : remote).path);
+    if (action === 'external' && entry && side === 'local') void invoke('local_open', { path: entry.path }).catch(e => notify(String(e)));
+    if (action === 'select-all') { const paths = (side === 'local' ? visibleLocal : visibleRemote).map(e => e.path); if (side === 'local') localSelected = paths; else remoteSelected = paths; }
+  }
+  function contextKeys(event: KeyboardEvent) {
+    const buttons = [...contextElement.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (['ArrowDown','ArrowUp','Home','End'].includes(event.key)) { event.preventDefault(); buttons[event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus(); }
+    if (event.key === 'Tab' || event.key === 'Escape') contextMenu = null;
+  }
+  async function openLocal(path: string, name: string) {
+    if (/\.(jpe?g|png|webp|gif|bmp|mp3|m4a|flac|wav|ogg|aac|opus)$/i.test(name)) { mediaRequest++; media = { path, name }; }
+    else { try { await invoke('local_open', { path }); } catch (error) { notify(String(error)); } }
   }
   async function chooseLocal() {
     if (!desktop) return;
@@ -134,7 +175,7 @@
 
   async function openEntry(side: Side, entry: Entry) {
     if (entry.isDir) await load(side, entry.path);
-    else if (side === 'local') { try { await invoke('local_open', { path: entry.path }); } catch (error) { notify(String(error)); } }
+    else if (side === 'local') await openLocal(entry.path, entry.name);
     else {
       if (transfers.some(t => t.openAfter && t.source === entry.path && ['queued', 'running'].includes(t.status))) { notify('Este arquivo já está sendo baixado para abrir.'); return; }
       if (!local.path) await chooseLocal();
@@ -177,7 +218,7 @@
     if (manual) autoConnect = false;
     connectedSavedId = '';
     try { await invoke('disconnect_device'); } catch (error) { notify(String(error)); return; }
-    device = null; ++loadVersions.remote; remote = blank(); remoteSelected = []; remoteError = ''; remoteLoading = false; history = { ...history, remote: [] };
+    device = null; ++loadVersions.remote; remote = blank(); remoteSelected = []; remoteError = ''; remoteLoading = false; history = { ...history, remote: [] }; forwardHistory = { ...forwardHistory, remote: [] };
     transfers = transfers.map(t => t.status === 'queued' ? { ...t, status: 'cancelled' } : t);
   }
   function enqueue(side: Side, entries?: Entry[], openAfter = false) {
@@ -201,8 +242,8 @@
         updateTransfer(next.id, { status: 'running' });
         try {
           const downloadedPath = await invoke<string | null>('transfer_file', { id: next.id, direction: next.direction, source: next.source, destination: next.destination, openAfter: !!next.openAfter });
-          updateTransfer(next.id, { status: 'done', transferred: next.total });
-          if (next.openAfter && downloadedPath) { try { await invoke('local_open', { path: downloadedPath }); } catch (error) { notify(`Arquivo baixado, mas não foi possível abrir: ${String(error)}`); } }
+          updateTransfer(next.id, { status: 'done', transferred: transfers.find(t => t.id === next.id)?.total || next.total });
+          if (next.openAfter && downloadedPath) await openLocal(downloadedPath, next.name);
           const side = next.direction === 'upload' ? 'remote' : 'local';
           if (device && next.destination === (side === 'local' ? local.path : remote.path)) await load(side, next.destination);
         } catch (error) { updateTransfer(next.id, { status: String(error).includes('cancelada') ? 'cancelled' : 'error', error: String(error) }); }
@@ -216,6 +257,9 @@
   }
   function keydown(event: KeyboardEvent) {
     const key = event.key.toLowerCase(), ctrl = event.ctrlKey || event.metaKey;
+    if (media) { if (event.key === 'Escape') { event.preventDefault(); media = null; } return; }
+    if (contextMenu) { if (event.key === 'Escape') contextMenu = null; return; }
+    if (event.altKey && ['ArrowLeft','ArrowRight'].includes(event.key)) { event.preventDefault(); if (!modal && section === 'Arquivos') { if (event.key === 'ArrowLeft') goBack(activeSide); else goForward(activeSide); } return; }
     const editing = event.target instanceof HTMLElement && !!event.target.closest('input, textarea, [contenteditable="true"]');
     if (ctrl && key === 'f') {
       event.preventDefault();
@@ -291,7 +335,7 @@
   });
 </script>
 
-<svelte:window on:pointermove={pointerMove} on:pointerup={pointerUp} on:pointercancel={() => { drag = null; dropSide = null; }} on:blur={() => { drag = null; dropSide = null; }} on:keydown={keydown}/>
+<svelte:window on:mousedown={mouseNavigate} on:mouseup={mouseNavigate} on:auxclick={(event) => { if ([3, 4].includes(event.button)) event.preventDefault(); }} on:resize={() => contextMenu = null} on:pointermove={pointerMove} on:pointerup={pointerUp} on:pointercancel={() => { drag = null; dropSide = null; }} on:blur={() => { drag = null; dropSide = null; }} on:keydown={keydown}/>
 
 <TitleBar {desktop} onError={notify}/>
 <div class="app-shell">
@@ -310,8 +354,8 @@
     {#if !desktop}<div class="preview-banner"><CircleHelp size={16}/>Prévia visual · Execute a versão Windows para acessar seus arquivos.</div>{/if}
     {#if section === 'Arquivos'}
       <div class="workspace">
-        <FilePane bind:this={localPane} active={activeSide === 'local'} {transfers} onActivate={() => activeSide = 'local'} onVisible={entries => visibleLocal = entries} canGoBack={history.local.length > 0} onBack={() => goBack('local')} side="local" title="Este PC" listing={local} loading={localLoading} error={localError} selected={localSelected} {desktop} dropActive={dropSide === 'local'} onNavigate={path => void load('local', path)} onChoose={() => void chooseLocal()} onConnect={() => showModal('connect')} onRefresh={() => void load('local', local.path)} onSelect={(entry, event) => select('local', entry, event)} onOpen={entry => void openEntry('local', entry)} onNewFolder={() => showModal('mkdir')} onRename={() => showModal('rename')} onDelete={() => showModal('delete')} onTransfer={() => enqueue('local')} onDrag={(entry, event) => beginDrag('local', entry, event)}/>
-        <FilePane bind:this={remotePane} active={activeSide === 'remote'} {transfers} onActivate={() => activeSide = 'remote'} onVisible={entries => visibleRemote = entries} canGoBack={history.remote.length > 0} onBack={() => goBack('remote')} side="remote" title={device?.name || 'Meu Android'} listing={remote} loading={remoteLoading} connected={!!device} error={remoteError} selected={remoteSelected} {desktop} dropActive={dropSide === 'remote' || nativeDrop} onNavigate={path => void load('remote', path)} onChoose={() => {}} onConnect={() => showModal('connect')} onRefresh={() => void load('remote', remote.path)} onSelect={(entry, event) => select('remote', entry, event)} onOpen={entry => void openEntry('remote', entry)} onNewFolder={() => showModal('mkdir', 'remote')} onRename={() => showModal('rename', 'remote')} onDelete={() => showModal('delete', 'remote')} onTransfer={() => enqueue('remote')} onDrag={(entry, event) => beginDrag('remote', entry, event)}/>
+        <FilePane canGoForward={forwardHistory.local.length > 0} onForward={() => goForward('local')} onContext={(entry, event) => showContext('local', entry, event)} bind:this={localPane} active={activeSide === 'local'} {transfers} onActivate={() => activeSide = 'local'} onVisible={entries => visibleLocal = entries} canGoBack={history.local.length > 0} onBack={() => goBack('local')} side="local" title="Este PC" listing={local} loading={localLoading} error={localError} selected={localSelected} {desktop} dropActive={dropSide === 'local'} onNavigate={path => void load('local', path)} onChoose={() => void chooseLocal()} onConnect={() => showModal('connect')} onRefresh={() => void load('local', local.path)} onSelect={(entry, event) => select('local', entry, event)} onOpen={entry => void openEntry('local', entry)} onNewFolder={() => showModal('mkdir')} onRename={() => showModal('rename')} onDelete={() => showModal('delete')} onTransfer={() => enqueue('local')} onDrag={(entry, event) => beginDrag('local', entry, event)}/>
+        <FilePane canGoForward={forwardHistory.remote.length > 0} onForward={() => goForward('remote')} onContext={(entry, event) => showContext('remote', entry, event)} bind:this={remotePane} active={activeSide === 'remote'} {transfers} onActivate={() => activeSide = 'remote'} onVisible={entries => visibleRemote = entries} canGoBack={history.remote.length > 0} onBack={() => goBack('remote')} side="remote" title={device?.name || 'Meu Android'} listing={remote} loading={remoteLoading} connected={!!device} error={remoteError} selected={remoteSelected} {desktop} dropActive={dropSide === 'remote' || nativeDrop} onNavigate={path => void load('remote', path)} onChoose={() => {}} onConnect={() => showModal('connect')} onRefresh={() => void load('remote', remote.path)} onSelect={(entry, event) => select('remote', entry, event)} onOpen={entry => void openEntry('remote', entry)} onNewFolder={() => showModal('mkdir', 'remote')} onRename={() => showModal('rename', 'remote')} onDelete={() => showModal('delete', 'remote')} onTransfer={() => enqueue('remote')} onDrag={(entry, event) => beginDrag('remote', entry, event)}/>
       </div>
     {:else if section === 'Dispositivos'}
       <section class="page-section"><div class="section-heading"><h2>Seus dispositivos</h2><button class="primary-button" on:click={() => showModal('connect')}><Plus size={17}/>Conectar celular</button></div>{#if device}<div class="device-card"><Smartphone size={36}/><div><h3>{device.name}</h3><p>Conectado nesta sessão</p><span>{bytes(device.freeBytes)} disponíveis de {bytes(device.totalBytes)}</span></div><button class="small-button" on:click={() => void disconnect()}>Desconectar</button></div>{:else if !remembered.length}<div class="empty-state full-empty"><Smartphone size={44}/><h3>Seu primeiro dispositivo</h3><p>Ative a conexão no Android e informe o IP e o código para acessar as pastas pelo PC.</p><button class="primary-button" on:click={() => showModal('connect')}>Configurar conexão</button></div>{/if}<div class="remembered-heading"><div><h3>Dispositivos lembrados</h3><p>Abra o Android na mesma rede para conectar sem IP nem código.</p></div><button class="small-button" disabled={scanning || quickConnecting} on:click={() => { autoConnect = true; void refreshRemembered(); }}><RefreshCw size={16}/>{scanning ? 'Procurando…' : 'Atualizar'}</button></div>
@@ -319,7 +363,7 @@
       {#if !remembered.length}<p class="remembered-help">Na primeira autorização no Android, marque “Lembrar dispositivo”. Depois, basta abrir os dois aplicativos.</p>{/if}
       {#if discoveryError}<p class="remembered-help">{discoveryError}</p>{/if}</section>
     {/if}
-      <section class="page-section settings-page" hidden={section !== 'Configurações'}><h2>Preferências</h2><div class="setting-row"><div><h3>Aparência</h3><p>Tema escuro com destaque em verde esmeralda.</p></div><span class="setting-value">Escuro</span></div><div class="setting-row"><div><h3>Arquivos com o mesmo nome</h3><p>Um arquivo existente nunca é substituído automaticamente.</p></div><span class="setting-value">Preservar original</span></div><div class="setting-row"><div><h3>Exclusão no computador</h3><p>Os arquivos excluídos são enviados para a Lixeira do Windows.</p></div><span class="setting-value">Lixeira</span></div><div class="setting-row"><div><h3>Transferências</h3><p>Um arquivo por vez, com progresso e cancelamento.</p></div><span class="setting-value">Fila sequencial</span></div><UpdatePanel transferring={activeTransfers.length > 0} onAvailable={(version) => notify(`SFLink ${version} disponível. Abra Configurações para atualizar.`)}/><div class="about-app"><img src={logo} alt="Logo SFLink" style="width:36px;height:30px"/><div><strong>SFLink</strong><p>Versão 0.4.0 · Gerenciador de arquivos via Wi-Fi</p></div></div></section>
+      <div class="settings-shell" hidden={section !== 'Configurações'}><SettingsPanel transferring={activeTransfers.length > 0} onAvailable={(version) => notify(`SFLink ${version} disponível. Abra Configurações para atualizar.`)}/></div>
 
     {#if section === 'Arquivos' || section === 'Transferências'}
       <section class="transfer-panel" class:expanded={section === 'Transferências'}>
@@ -349,5 +393,15 @@
         <div class="modal-actions"><button type="button" class="small-button" disabled={busy} on:click={() => modal = null}>Cancelar</button><button class="primary-button" class:danger={modal === 'delete' && modalSide === 'remote'} disabled={busy || (!desktop && modal === 'connect')}>{#if busy}<LoaderCircle class="spin" size={17}/>{/if}{modal === 'connect' ? 'Conectar' : modal === 'mkdir' ? 'Criar pasta' : modal === 'rename' ? 'Salvar nome' : 'Confirmar'}</button></div>
       </form>
     </div>
+  </div>
+{/if}
+
+{#if media}{#key mediaRequest}<MediaModal path={media.path} name={media.name} onClose={() => media = null}/>{/key}{/if}
+{#if contextMenu}
+  <div class="context-dismiss" role="presentation" on:pointerdown={() => contextMenu = null} on:contextmenu|preventDefault={() => contextMenu = null}></div>
+  <div bind:this={contextElement} class="file-context-menu" role="menu" aria-label="Opções de arquivos" style={`left:${contextMenu.x}px;top:${contextMenu.y}px`} on:keydown={contextKeys} tabindex="-1">
+    <span class="context-caption">{contextMenu.entry?.name || 'Nesta pasta'}</span>
+    {#if contextMenu.entry}<button role="menuitem" on:click={() => contextAction('open')}><FolderOpen size={16}/>Abrir <kbd>Enter</kbd></button>{#if !contextMenu.entry.isDir}<button role="menuitem" on:click={() => contextAction('transfer')}><ArrowDownUp size={16}/>{contextMenu.side === 'local' ? 'Enviar ao celular' : 'Baixar no PC'}</button>{/if}{#if contextMenu.side === 'local' && !contextMenu.entry.isDir}<button role="menuitem" on:click={() => contextAction('external')}><ArrowUpRight size={16}/>Abrir no Windows</button>{/if}<div class="context-divider"></div><button role="menuitem" disabled={(contextMenu.side === 'local' ? localSelected : remoteSelected).length !== 1} on:click={() => contextAction('rename')}>Renomear <kbd>F2</kbd></button><button role="menuitem" class="context-danger" on:click={() => contextAction('delete')}>Excluir <kbd>Delete</kbd></button><div class="context-divider"></div>{/if}
+    <button role="menuitem" on:click={() => contextAction('mkdir')}><Plus size={16}/>Nova pasta</button><button role="menuitem" on:click={() => contextAction('select-all')}>Selecionar tudo <kbd>Ctrl+A</kbd></button><button role="menuitem" on:click={() => contextAction('refresh')}><RefreshCw size={16}/>Atualizar <kbd>F5</kbd></button>
   </div>
 {/if}

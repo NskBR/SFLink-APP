@@ -119,22 +119,56 @@ async fn fetch(app: &AppHandle, approved: &Approved) -> Result<PathBuf, String> 
 }
 
 #[tauri::command]
-pub fn install_update(app: AppHandle, state: State<'_, Updater>, files: State<'_, crate::AppState>) -> Result<(), String> {
-    if INSTALLING.load(Ordering::SeqCst) { return Err("A instalação já está iniciando.".into()); }
+pub async fn install_update(app: AppHandle, state: State<'_, Updater>, files: State<'_, crate::AppState>) -> Result<(), String> {
     if cfg!(debug_assertions) { return Err("Instalação disponível na versão compilada do aplicativo.".into()); }
-    let transfers = files.transfers.lock().map_err(|e| e.to_string())?;
-    if !transfers.is_empty() { return Err("Aguarde as transferências terminarem antes de instalar.".into()); }
-    let runtime = state.inner.lock().map_err(|e| e.to_string())?;
-    if runtime.downloading.is_some() { return Err("Aguarde o download terminar.".into()); }
-    let (path, expected) = runtime.ready.as_ref().ok_or("Baixe a atualização primeiro.")?;
-    let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
-    let mut hash = Sha256::new(); std::io::copy(&mut file, &mut hash).map_err(|e| e.to_string())?;
-    if format!("{:x}", hash.finalize()) != *expected { return Err("O instalador foi alterado após o download.".into()); }
-    INSTALLING.store(true, Ordering::SeqCst);
-    // Launch the normal NSIS wizard; it asks for any required Windows consent.
-    let result = std::process::Command::new(path).spawn();
-    if let Err(e) = result { INSTALLING.store(false, Ordering::SeqCst); return Err(format!("Não foi possível abrir o instalador: {e}")); }
+    let (installer, hash) = {
+        let runtime = state.inner.lock().map_err(|e| e.to_string())?;
+        if runtime.downloading.is_some() { return Err("Aguarde o download terminar.".into()); }
+        runtime.ready.clone().ok_or("Baixe a atualização primeiro.")?
+    };
+    {
+        let transfers = files.transfers.lock().map_err(|e| e.to_string())?;
+        if !transfers.is_empty() { return Err("Aguarde as transferências terminarem antes de instalar.".into()); }
+        if INSTALLING.swap(true, Ordering::SeqCst) { return Err("A instalação já está iniciando.".into()); }
+    }
+    let result = prepare_install(&app, &installer, &hash).await;
+    if result.is_err() { INSTALLING.store(false, Ordering::SeqCst); }
+    result
+}
+async fn prepare_install(app: &AppHandle, installer: &std::path::Path, hash: &str) -> Result<(), String> {
+    let mut random = [0u8; 16]; getrandom::fill(&mut random).map_err(|e| e.to_string())?;
+    let folder = app.path().app_local_data_dir().map_err(|e| e.to_string())?.join("updates").join(random.iter().map(|v| format!("{v:02x}")).collect::<String>());
+    std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
+    let executable = std::env::current_exe().map_err(|e| e.to_string())?;
+    let destination = executable.parent().ok_or("Pasta do aplicativo inválida.")?;
+    let ready = folder.join("ready"); let go = folder.join("go"); let error = folder.join("error");
+    let script = folder.join("install.ps1"); let config = folder.join("config.json");
+    std::fs::write(&script, format!("\u{feff}{}", include_str!("update-helper.ps1"))).map_err(|e| e.to_string())?;
+    let data = serde_json::json!({ "installer": installer, "sha256": hash, "parent": std::process::id(), "parentStart": parent_start_ticks()?, "destination": destination, "executable": destination.join("wifi-files.exe"), "ready": ready, "go": go, "error": error });
+    std::fs::write(&config, serde_json::to_vec(&data).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    let mut command = std::process::Command::new("powershell.exe");
+    command.args(["-NoProfile", "-STA", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File"]).arg(&script).arg("-ConfigPath").arg(&config);
+    #[cfg(windows)] { use std::os::windows::process::CommandExt; command.creation_flags(0x08000000); }
+    let mut helper = command.spawn().map_err(|e| format!("Não foi possível abrir a tela de atualização: {e}"))?;
+    let deadline = std::time::Instant::now() + Duration::from_secs(45);
+    loop {
+        if error.exists() { let _ = helper.kill(); return Err(std::fs::read_to_string(error).unwrap_or_else(|_| "Falha na atualização.".into())); }
+        if ready.exists() { break; }
+        if std::time::Instant::now() > deadline || helper.try_wait().map_err(|e| e.to_string())?.is_some() { let _ = helper.kill(); return Err("A tela de atualização não ficou pronta. O SFLink continuará aberto.".into()); }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    if let Err(error) = std::fs::write(go, "install") { let _ = helper.kill(); return Err(error.to_string()); }
     app.exit(0); Ok(())
+}
+fn parent_start_ticks() -> Result<String, String> {
+    // Compare process creation time so a reused PID never blocks the installer.
+    #[cfg(windows)] {
+        use std::os::windows::process::CommandExt;
+        let output = std::process::Command::new("powershell.exe").args(["-NoProfile", "-Command", &format!("(Get-Process -Id {}).StartTime.ToUniversalTime().Ticks.ToString()", std::process::id())]).creation_flags(0x08000000).output().map_err(|e| e.to_string())?;
+        if !output.status.success() { return Err("Não foi possível identificar o processo atual.".into()); }
+        Ok(String::from_utf8_lossy(&output.stdout).trim().into())
+    }
+    #[cfg(not(windows))] { Ok(String::new()) }
 }
 
 #[cfg(test)]

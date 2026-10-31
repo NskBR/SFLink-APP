@@ -21,3 +21,9 @@ O atualizador consulta somente o repositório oficial configurado. Confere taman
 A distribuição Android de teste usa debug. A primeira assinatura de produção deve ser definida antes de publicar o APK definitivo; trocar essa assinatura quebra a atualização direta do preview. Veja [updates.md](desktop/docs/updates.md).
 
 O fluxo foi concebido para rede local. A operação de atualização usa internet/GitHub, sem enviar nomes de arquivos, tokens de pareamento ou conteúdo transferido. Diagnósticos e screenshots compartilhados pelo usuário devem remover informações pessoais antes de serem publicados.
+
+## Visualizador e splash (0.5.0)
+
+O protocolo de assets inicia com escopo vazio e libera individualmente arquivos de foto/áudio explicitamente abertos pelo usuário, após validar extensão e arquivo regular. Não libera diretórios inteiros. As liberações duram a sessão do aplicativo. Capas e miniaturas são retornadas como PNG reduzido, com limites de tamanho/decodificação, sem cache de disco.
+
+O splash executa um auxiliar local que verifica o SHA-256 antes de sinalizar prontidão e antes de iniciar o instalador. O app só fecha após a prontidão, bloqueando novas transferências nesse intervalo. O auxiliar usa o instalador já verificado, em modo silencioso, e exibe falha caso a instalação não conclua. O checksum continua dependendo da conta/repositório GitHub e não equivale a uma assinatura independente do instalador Windows.

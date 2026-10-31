@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { invoke, isTauri } from '@tauri-apps/api/core';
-  import { Image } from '@lucide/svelte';
+  import { Image, Music2 } from '@lucide/svelte';
   import type { Side } from './lib/types';
   export let side: Side;
+  export let audio = false;
   export let path: string;
   let host: HTMLSpanElement;
   let source = '';
@@ -20,7 +21,7 @@
   });
 </script>
 <span bind:this={host} class="photo-thumbnail" aria-hidden="true">
-  {#if source}<img src={source} alt="" draggable="false"/>{:else}<Image size={21}/>{/if}
+  {#if source}<img src={source} alt="" draggable="false"/>{:else if audio}<Music2 size={21}/>{:else}<Image size={21}/>{/if}
 </span>
 <style>
   .photo-thumbnail{width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:6px;overflow:hidden;color:var(--accent);background:#131d22}

@@ -15,7 +15,9 @@ O download usa HTTPS e arquivo temporário. O app confere tamanho e SHA-256, rem
 
 ## Windows
 
-O usuário escolhe baixar e depois **Instalar e fechar SFLink**. A fila deve terminar antes de instalar. O instalador NSIS convencional abre e o aplicativo fecha; a instalação e eventuais permissões do Windows continuam na tela do instalador. Não há instalação silenciosa. Se cancelar o instalador, abra o aplicativo novamente. O modo de desenvolvimento recusa instalar.
+Na 0.5.0 ou posterior, **Baixar e atualizar** baixa e verifica o instalador, aguarda ausência de transferências ativas, abre um auxiliar PowerShell/WPF com splash e verifica novamente o SHA-256. O app só fecha após o auxiliar sinalizar que está pronto; o auxiliar aguarda o processo original sair e executa NSIS com `/S /UPDATE /D=...`. Ao concluir com sucesso, reabre `wifi-files.exe` no diretório instalado. Falhas aparecem no splash; a preparação falha sem fechar o app se o auxiliar não ficar pronto. Solicitações de permissão do Windows não são contornadas.
+
+O modo de desenvolvimento recusa instalar. Um download pronto com transferências em andamento aguarda a ação posterior do usuário. Não há alteração desse fluxo em versões já instaladas: 0.4.0 usa seu instalador convencional para chegar à 0.5.0.
 
 Build: `npm ci` e `npm run desktop:build`. O instalador fica em `src-tauri/target/release/bundle/nsis/`.
 

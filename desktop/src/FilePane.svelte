@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowLeft, ArrowUp, RefreshCw, Search, FolderPlus, FolderOpen, Folder, Music2, Image, File, Monitor, Smartphone, Upload, Download, Pencil, Trash2, Cable, LoaderCircle } from '@lucide/svelte';
+  import { ArrowRight, ArrowLeft, ArrowUp, RefreshCw, Search, FolderPlus, FolderOpen, Folder, Music2, Image, File, Monitor, Smartphone, Upload, Download, Pencil, Trash2, Cable, LoaderCircle } from '@lucide/svelte';
   import type { Entry, Listing, Side } from './lib/types';
   import { bytes } from './lib/types';
   import { focusInput } from './lib/focus';
@@ -19,6 +19,9 @@
   export let dropActive = false;
   export let desktop = true;
   export let canGoBack = false;
+  export let canGoForward = false;
+  export let onForward: () => void = () => {};
+  export let onContext: (entry: Entry | null, event: MouseEvent) => void = () => {};
   export let onBack: () => void;
   export let onNavigate: (path: string) => void;
   export let onChoose: () => void;
@@ -54,6 +57,7 @@
   </header>
   <div class="pane-toolbar">
     <button class="icon-button" title="Pasta anterior" aria-label="Pasta anterior" disabled={!canGoBack || loading} on:click={onBack}><ArrowLeft size={18}/></button>
+    <button class="icon-button" title="Pasta seguinte" aria-label="Pasta seguinte" disabled={!canGoForward || loading} on:click={onForward}><ArrowRight size={18}/></button>
     <button class="icon-button" title="Subir uma pasta" aria-label="Subir uma pasta" disabled={!listing.parent || loading} on:click={() => listing.parent && onNavigate(listing.parent)}><ArrowUp size={18}/></button>
     {#if editingPath}
       <form class="path-form" on:submit|preventDefault={() => { editingPath = false; onNavigate(typedPath); }}><input use:focusInput aria-label="Caminho da pasta" bind:value={typedPath} on:keydown={(event) => { if (event.key === 'Escape') editingPath = false; }}/></form>
@@ -70,7 +74,7 @@
     {#if side === 'local'}<button class="icon-button" aria-label="Escolher pasta do PC" title="Escolher pasta do PC" disabled={!desktop} on:click={onChoose}><FolderOpen size={17}/></button>{/if}
   </div>
   <div class="table-head"><span>Nome</span><span>Tamanho</span></div>
-  <div class="file-list">
+  <div class="file-list" role="presentation" on:contextmenu={(event) => onContext(null, event)}>
     {#if !connected}
       <div class="empty-state connection-empty">
         <div class="device-illustration"><Smartphone size={46}/><span class="signal-dot"></span></div>
@@ -91,8 +95,8 @@
       {#each filtered as entry (entry.path)}
         {@const Icon = icon(entry)}
         {@const status = [...transfers].reverse().find(t => t.source === entry.path && t.direction === (side === 'local' ? 'upload' : 'download'))}
-        <button class="file-row" class:selected={selected.includes(entry.path)} aria-pressed={selected.includes(entry.path)} title={entry.name} on:click={(event) => onSelect(entry, event)} on:dblclick={() => onOpen(entry)} on:keydown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onOpen(entry); } }} on:pointerdown={(event) => { event.currentTarget.focus({ preventScroll: true }); onDrag(entry, event); }}>
-          <span class="file-name">{#if !entry.isDir && /\.(jpe?g|png|webp)$/i.test(entry.name)}{#key `${entry.path}:${entry.modified}:${entry.size}`}<PhotoThumbnail {side} path={entry.path}/>{/key}{:else}<span class="file-icon" class:folder={entry.isDir} class:audio={Icon === Music2} class:image={Icon === Image}><Icon size={21} fill={entry.isDir ? 'currentColor' : 'none'} strokeWidth={1.6}/></span>{/if}<span class="file-label"><span>{entry.name}</span>{#if status}<span class="row-transfer-status" class:failed={status.status === 'error'}>{status.status === 'running' ? `${status.direction === 'upload' ? 'Enviando' : 'Baixando'} · ${status.total ? Math.min(100, Math.round(status.transferred / status.total * 100)) + '%' : bytes(status.transferred)}` : status.status === 'queued' ? `Na fila para ${status.direction === 'upload' ? 'enviar' : 'baixar'}` : status.status === 'done' ? (status.direction === 'upload' ? 'Enviado' : 'Baixado') : status.status === 'cancelled' ? 'Cancelado' : 'Falha na transferência'}</span>{#if status.status === 'running'}<span class="row-progress"><span style={`width:${status.total ? Math.min(100, status.transferred / status.total * 100) : 0}%`}></span></span>{/if}{/if}</span></span>
+        <button on:contextmenu|stopPropagation={(event) => onContext(entry, event)} class="file-row" class:selected={selected.includes(entry.path)} aria-pressed={selected.includes(entry.path)} title={entry.name} on:click={(event) => onSelect(entry, event)} on:dblclick={() => onOpen(entry)} on:keydown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onOpen(entry); } }} on:pointerdown={(event) => { event.currentTarget.focus({ preventScroll: true }); onDrag(entry, event); }}>
+          <span class="file-name">{#if !entry.isDir && /\.(jpe?g|png|webp|mp3|m4a|flac|wav|ogg|aac|opus)$/i.test(entry.name)}{#key `${entry.path}:${entry.modified}:${entry.size}`}<PhotoThumbnail {side} audio={Icon === Music2} path={entry.path}/>{/key}{:else}<span class="file-icon" class:folder={entry.isDir} class:audio={Icon === Music2} class:image={Icon === Image}><Icon size={21} fill={entry.isDir ? 'currentColor' : 'none'} strokeWidth={1.6}/></span>{/if}<span class="file-label"><span>{entry.name}</span>{#if status}<span class="row-transfer-status" class:failed={status.status === 'error'}>{status.status === 'running' ? `${status.direction === 'upload' ? 'Enviando' : 'Baixando'} · ${status.total ? Math.min(100, Math.round(status.transferred / status.total * 100)) + '%' : bytes(status.transferred)}` : status.status === 'queued' ? `Na fila para ${status.direction === 'upload' ? 'enviar' : 'baixar'}` : status.status === 'done' ? (status.direction === 'upload' ? 'Enviado' : 'Baixado') : status.status === 'cancelled' ? 'Cancelado' : 'Falha na transferência'}</span>{#if status.status === 'running'}<span class="row-progress"><span style={`width:${status.total ? Math.min(100, status.transferred / status.total * 100) : 0}%`}></span></span>{/if}{/if}</span></span>
           <span class="file-size">{entry.isDir ? '—' : bytes(entry.size)}</span>
         </button>
       {/each}

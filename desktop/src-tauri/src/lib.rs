@@ -762,6 +762,7 @@ pub fn run() {
             local_trash,
             local_open,
             previews::image_thumbnail,
+            previews::prepare_media,
             read_pairing,
             connect_device,
             pair_device,
