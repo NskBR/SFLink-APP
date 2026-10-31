@@ -47,3 +47,7 @@ O script `tools/build-release.ps1` na raiz do repositório automatiza os builds 
 Certificado público da assinatura Android (SHA-256): `0ce84853a7b97ea03b738c2b95c90e3c05e4fc6aede95fc891a6067abe80e58e`.
 
 Referências: [GitHub Releases API](https://docs.github.com/en/rest/releases/releases), [assinatura Android](https://developer.android.com/studio/publish/app-signing), [permissão de instalação](https://developer.android.com/reference/android/content/pm/PackageManager#canRequestPackageInstalls()).
+
+## Consultas e ação explícita — 0.6.0
+
+O agendamento é centralizado para que titlebar e Configurações compartilhem o mesmo estado: primeira consulta após 10 segundos, seguintes a cada 60 segundos. Consultas periódicas só atualizam a indicação de disponibilidade; nunca iniciam download/instalação. Clicar em Atualizar na titlebar inicia download e depois instalação. Verificar agora em Configurações é somente consulta. Temporizadores e assinatura de progresso são removidos ao desmontar o app; verificações não se sobrepõem a download, preparação de instalação ou download já pronto.

@@ -10,6 +10,7 @@
   import TitleBar from './TitleBar.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import MediaModal from './MediaModal.svelte';
+  import { startUpdateChecks, setUpdateTransfers } from './lib/updater';
   import logo from './assets/sflink-logo.svg';
   import type { Entry, Listing, Shortcut, Device, Side, Transfer } from './lib/types';
   import { bytes } from './lib/types';
@@ -19,7 +20,7 @@
   const blank = (): Listing => ({ path: '', parent: null, entries: [] });
   let section = 'Arquivos';
   let activeSide: Side = 'local';
-  let media: { path: string; name: string } | null = null;
+  let media: { path: string; name: string; playlist: { path: string; name: string }[] } | null = null;
   let mediaRequest = 0;
   let forwardHistory: Record<Side, string[]> = { local: [], remote: [] };
   let contextMenu: { side: Side; entry: Entry | null; x: number; y: number } | null = null;
@@ -91,6 +92,7 @@
   let loadVersions = { local: 0, remote: 0 };
   let history: Record<Side, string[]> = { local: [], remote: [] };
   $: activeTransfers = transfers.filter(t => t.status === 'running' || t.status === 'queued');
+  $: setUpdateTransfers(activeTransfers.length > 0);
   $: running = transfers.find(t => t.status === 'running');
   $: progress = running ? running.total ? Math.min(100, Math.round(running.transferred / running.total * 100)) : 0 : 0;
 
@@ -149,7 +151,7 @@
     if (event.key === 'Tab' || event.key === 'Escape') contextMenu = null;
   }
   async function openLocal(path: string, name: string) {
-    if (/\.(jpe?g|png|webp|gif|bmp|mp3|m4a|flac|wav|ogg|aac|opus)$/i.test(name)) { mediaRequest++; media = { path, name }; }
+    if (/\.(jpe?g|png|webp|gif|bmp|mp3|m4a|flac|wav|ogg|aac|opus)$/i.test(name)) { mediaRequest++; media = { path, name, playlist: [...local.entries.filter(e => !e.isDir && /\.(mp3|flac|m4a|wav|ogg|aac|opus)$/i.test(e.name)).map(e => ({ path: e.path, name: e.name })), ...(!local.entries.some(e => e.path === path) ? [{ path, name }] : [])] }; }
     else { try { await invoke('local_open', { path }); } catch (error) { notify(String(error)); } }
   }
   async function chooseLocal() {
@@ -304,7 +306,7 @@
     } catch (error) { modalError = String(error); }
   }
   onMount(() => {
-    const cleanups: (() => void)[] = [];
+    const cleanups: (() => void)[] = [startUpdateChecks()];
     let destroyed = false;
     async function setup() {
       if (!desktop) return;
@@ -363,7 +365,7 @@
       {#if !remembered.length}<p class="remembered-help">Na primeira autorização no Android, marque “Lembrar dispositivo”. Depois, basta abrir os dois aplicativos.</p>{/if}
       {#if discoveryError}<p class="remembered-help">{discoveryError}</p>{/if}</section>
     {/if}
-      <div class="settings-shell" hidden={section !== 'Configurações'}><SettingsPanel transferring={activeTransfers.length > 0} onAvailable={(version) => notify(`SFLink ${version} disponível. Abra Configurações para atualizar.`)}/></div>
+      <div class="settings-shell" hidden={section !== 'Configurações'}><SettingsPanel/></div>
 
     {#if section === 'Arquivos' || section === 'Transferências'}
       <section class="transfer-panel" class:expanded={section === 'Transferências'}>
@@ -396,7 +398,7 @@
   </div>
 {/if}
 
-{#if media}{#key mediaRequest}<MediaModal path={media.path} name={media.name} onClose={() => media = null}/>{/key}{/if}
+{#if media}{#key mediaRequest}<MediaModal path={media.path} name={media.name} playlist={media.playlist} onClose={() => media = null}/>{/key}{/if}
 {#if contextMenu}
   <div class="context-dismiss" role="presentation" on:pointerdown={() => contextMenu = null} on:contextmenu|preventDefault={() => contextMenu = null}></div>
   <div bind:this={contextElement} class="file-context-menu" role="menu" aria-label="Opções de arquivos" style={`left:${contextMenu.x}px;top:${contextMenu.y}px`} on:keydown={contextKeys} tabindex="-1">

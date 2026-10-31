@@ -87,3 +87,15 @@ pub async fn prepare_media(app: tauri::AppHandle, path: String) -> Result<String
     app.asset_protocol_scope().allow_file(&canonical).map_err(err)?;
     Ok(canonical.to_string_lossy().into_owned())
 }
+
+#[derive(serde::Serialize)]
+pub struct AudioMetadata { title: Option<String>, artist: Option<String> }
+#[tauri::command]
+pub async fn audio_metadata(path: String) -> Result<AudioMetadata, String> {
+    tokio::task::spawn_blocking(move || {
+        use lofty::{file::TaggedFileExt, prelude::Accessor};
+        let tagged = lofty::probe::Probe::open(path).map_err(err)?.read().map_err(err)?;
+        let tag = tagged.primary_tag().or_else(|| tagged.first_tag());
+        Ok(AudioMetadata { title: tag.and_then(|t| t.title()).map(|v| v.into_owned()), artist: tag.and_then(|t| t.artist()).map(|v| v.into_owned()) })
+    }).await.map_err(err)?
+}

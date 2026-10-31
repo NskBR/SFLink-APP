@@ -11,7 +11,7 @@ Gerenciador de arquivos entre Windows e Android pela rede Wi-Fi. Explore as past
 - “Lembrar dispositivo” autoriza reconexão sem repetir o código. Revogação disponível no Android.
 - Atualizador pelo GitHub Releases, com conferência de tamanho/SHA-256 e confirmação de instalação.
 
-Desktop: **0.5.0** · Android: **0.3.0**. [Baixe a release desktop](https://github.com/NskBR/SFLink-APP/releases/tag/v0.5.0) ou o [APK Android 0.3.0](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
+Desktop: **0.6.0** · Android: **0.3.0**. [Baixe a release desktop](https://github.com/NskBR/SFLink-APP/releases/tag/v0.6.0) ou o [APK Android 0.3.0](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
 
 ## Capturas de demonstração
 
@@ -59,3 +59,9 @@ Os botões laterais do mouse e Alt+Esquerda/Direita navegam pelo histórico do p
 Miniaturas de capa são lidas das tags do arquivo (MP3, M4A, FLAC, OGG e outros formatos reconhecidos), com limites de leitura e decodificação. Músicas sem capa incorporada ou arquivos acima do limite mantêm o ícone; não é feita busca de capa na internet. O visualizador acessa somente arquivos explicitamente abertos, através do protocolo de assets do Tauri, sem permissão global a diretórios. As permissões desses arquivos duram até o app fechar.
 
 A partir da 0.5.0, Baixar e atualizar verifica o instalador, abre um splash, fecha o app, executa o NSIS silenciosamente e reabre o SFLink. A fila deve estar parada. Permissões exigidas pelo Windows continuam sob controle do sistema. Se houver falha, o splash informa o erro; a instalação manual da release continua disponível. Atualizar de versões antigas para 0.5.0 ainda usa o fluxo antigo, pois o atualizador executado é o da versão instalada.
+
+## Player e atualizações (0.6.0)
+
+Player grafite inspirado na referência, com título/artista das tags, capa, reprodução/pausa central, duração, posição e volume. Anterior/próxima percorrem as músicas disponíveis na pasta local do PC; aleatório e repetição controlam essa lista. Fotos abrem diretamente sobre a sobreposição escura, sem caixa, com fechamento por Escape ou clique fora.
+
+O botão Atualizar fica na titlebar. A primeira consulta automática é feita 10 segundos após abrir o app e as seguintes a cada 60 segundos (10, 70, 130…). As consultas não baixam nem instalam nada. Só clicar em Atualizar ou Baixar e atualizar inicia o download verificado e depois a instalação/reabertura com splash. Verificar agora em Configurações consulta sem instalar. A fila deve terminar antes da instalação. Enquanto há download/instalação em curso, novas consultas não concorrem com essa operação.

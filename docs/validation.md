@@ -29,3 +29,9 @@ Build frontend sem erros/avisos. Treze testes Rust passaram (quatro testes de co
 - Interface validada com IPC simulado e áudio WAV real servido no ambiente de teste: reprodução/pausa, duração, volume, atalhos, histórico por botões de mouse, menu de renomear, temas e restauração do tema após reload.
 - Auxiliar de atualização executado no Windows com instalador e aplicativo de teste isolados: SHA incorreto rejeitado, handshake ready/go, parâmetros silenciosos, espera por término e reabertura. Esse teste não substitui uma atualização completa de duas instalações reais do SFLink/NSIS e não alterou a instalação do usuário.
 - O teste de interface usa protocolo de assets simulado; a disponibilidade de codecs no Windows/WebView2 deve ser conferida no uso real. Os novos fluxos não foram validados de novo com celular físico.
+
+## Desktop 0.6.0
+
+Validação de interface com relógio controlado: zero consultas antes de 10 segundos, primeira aos 10, segunda aos 70, e nenhuma chamada de download/instalação após essas consultas mesmo com versão disponível. O clique explícito na titlebar chama download e depois instalação, nessa ordem. O teste usa IPC simulado e não executa instalador real.
+
+Áudio de teste real: reprodução/pausa, seek, volume, anterior/próxima, aleatório e repetição passaram na interface. Fotos carregam com superfície transparente, sem caixa de fundo. Persistência de temas, navegação por mouse e menus continuaram passando. Essas verificações não substituem o uso com os arquivos/codecs do usuário e celular físico.

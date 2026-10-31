@@ -763,6 +763,7 @@ pub fn run() {
             local_open,
             previews::image_thumbnail,
             previews::prepare_media,
+            previews::audio_metadata,
             read_pairing,
             connect_device,
             pair_device,
