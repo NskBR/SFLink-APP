@@ -5,7 +5,7 @@
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { open } from '@tauri-apps/plugin-dialog';
-  import { Wifi, Folder, ArrowDownUp, Smartphone, Settings, Plus, ArrowUpRight, Check, X, LoaderCircle, RefreshCw, Monitor, ChevronDown, ShieldCheck, Upload, Download, CircleHelp, FolderOpen, Home, Music2, Image, FileText } from '@lucide/svelte';
+  import { Wifi, Folder, ArrowDownUp, Smartphone, Settings, Plus, ArrowUpRight, Check, X, LoaderCircle, RefreshCw, Monitor, ChevronDown, ShieldCheck, Upload, Download, CircleHelp, FolderOpen, Home, Music2, Image, FileText, FolderInput, ArrowUp } from '@lucide/svelte';
   import FilePane from './FilePane.svelte';
   import TitleBar from './TitleBar.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
@@ -80,9 +80,14 @@
   let queueOpen = true;
   let toast = '';
   let toastTimer: ReturnType<typeof setTimeout>;
-  let modal: 'connect' | 'mkdir' | 'rename' | 'delete' | null = null;
+  let modal: 'connect' | 'mkdir' | 'rename' | 'delete' | 'move' | null = null;
   let modalSide: Side = 'local';
   let inputName = '';
+  let moveFiles: Entry[] = [];
+  let moveFolder: Listing | null = null;
+  let moveLoading = false;
+  let moveBrowseVersion = 0;
+  $: canMoveHere = !!moveFolder && moveFolder.path !== remote.path && moveFiles.length > 0;
   let address = '', token = '', certificatePath = '';
   let certificatePem = '', importedConnection = false;
   let pairingVerification = '';
@@ -140,6 +145,7 @@
     const { side, entry } = menu;
     if (action === 'open' && entry) void openEntry(side, entry);
     if (action === 'transfer') enqueue(side);
+    if (action === 'move') startMove();
     if (action === 'rename' || action === 'delete' || action === 'mkdir') showModal(action, side);
     if (action === 'refresh') void load(side, (side === 'local' ? local : remote).path);
     if (action === 'external' && entry && side === 'local') void invoke('local_open', { path: entry.path }).catch(e => notify(String(e)));
@@ -201,6 +207,56 @@
       await openEntry('remote', { path: item.source, name: item.name, isDir: false, size: item.total, modified: item.modified ?? null });
     } else notify('O arquivo enviado não está mais disponível no PC.');
   }
+  function startMove() {
+    if (!device?.canMoveFiles) {
+      notify('Atualize o SFLink no Android para mover arquivos.');
+      return;
+    }
+    moveFiles = remote.entries.filter(entry => remoteSelected.includes(entry.path));
+    if (!moveFiles.length || moveFiles.some(entry => entry.isDir)) {
+      notify('Selecione apenas os arquivos que deseja mover.');
+      return;
+    }
+    moveFolder = null;
+    showModal('move', 'remote');
+    void browseMoveFolder(device.root);
+  }
+  async function browseMoveFolder(path: string) {
+    const version = ++moveBrowseVersion;
+    moveLoading = true;
+    modalError = '';
+    const connected = device;
+    try {
+      const listing = await invoke<Listing>('remote_list', { path });
+      if (version === moveBrowseVersion && modal === 'move' && device === connected) moveFolder = listing;
+    } catch (error) {
+      if (version === moveBrowseVersion && modal === 'move') modalError = String(error);
+    } finally { if (version === moveBrowseVersion) moveLoading = false; }
+  }
+  async function submitMove() {
+    if (!canMoveHere || !moveFolder || moveLoading) return;
+    const destination = moveFolder.path;
+    const source = remote.path;
+    const connected = device;
+    const failed: Entry[] = [];
+    const errors: string[] = [];
+    let moved = 0;
+    for (const entry of moveFiles) {
+      try {
+        if (!connected || device !== connected) throw 'A conexão com o celular foi encerrada.';
+        await invoke('remote_action', { action: 'move', path: entry.path, destination });
+        moved++;
+      } catch (error) {
+        failed.push(entry);
+        errors.push(`${entry.name}: ${String(error)}`);
+      }
+    }
+    moveFiles = failed;
+    if (moved && device === connected) await load('remote', source);
+    if (moved) notify(moved === 1 ? '1 arquivo movido.' : `${moved} arquivos movidos.`);
+    if (failed.length) modalError = errors.join('\n');
+    else modal = null;
+  }
   function showModal(type: typeof modal, side: Side = 'local') {
     if (quickConnecting) { notify('Aguarde a conexão rápida terminar.'); return; }
     modalSide = side; modalError = ''; inputName = ''; pairingVerification = '';
@@ -208,6 +264,7 @@
     modal = type;
   }
   async function submitModal() {
+    if (busy) return;
     busy = true; modalError = '';
     try {
       if (modal === 'connect') {
@@ -216,6 +273,8 @@
         device = connected; autoConnect = true; connectedSavedId = ''; token = ''; certificatePem = ''; importedConnection = false; modal = null;
         await load('remote', connected.root);
         notify(`${connected.name} conectado.`);
+      } else if (modal === 'move') {
+        await submitMove();
       } else {
         const listing = modalSide === 'local' ? local : remote;
         const selected = modalSide === 'local' ? localSelected : remoteSelected;
@@ -237,6 +296,7 @@
     if (manual) autoConnect = false;
     connectedSavedId = '';
     try { await invoke('disconnect_device'); } catch (error) { notify(String(error)); return; }
+    if (modal === 'move') modal = null;
     device = null; ++loadVersions.remote; remote = blank(); remoteSelected = []; remoteError = ''; remoteLoading = false; history = { ...history, remote: [] }; forwardHistory = { ...forwardHistory, remote: [] };
     transfers = transfers.map(t => t.status === 'queued' ? { ...t, status: 'cancelled' } : t);
   }
@@ -403,13 +463,29 @@
     <div use:focusDialog class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
       <button class="modal-close icon-button" aria-label="Fechar" disabled={busy} on:click={() => modal = null}><X size={19}/></button>
       <div class="modal-symbol">{#if modal === 'connect'}<Smartphone size={27}/>{:else}<Folder size={27}/>{/if}</div>
-      <h2 id="modal-title">{modal === 'connect' ? 'Conectar seu Android' : modal === 'mkdir' ? 'Nova pasta' : modal === 'rename' ? 'Renomear' : modalSide === 'local' ? 'Mover para a Lixeira?' : 'Excluir do celular?'}</h2>
+      <h2 id="modal-title">{modal === 'connect' ? 'Conectar seu Android' : modal === 'mkdir' ? 'Nova pasta' : modal === 'rename' ? 'Renomear' : modal === 'move' ? 'Mover arquivos' : modalSide === 'local' ? 'Mover para a Lixeira?' : 'Excluir do celular?'}</h2>
       <form on:submit|preventDefault={submitModal}>
         {#if modal === 'connect'}<p>Ative a conexão no Android. Digite o IP e o código temporário mostrado no celular.</p><div class="modal-notice"><Wifi size={18}/><span>Mantenha PC e celular na mesma rede.</span></div><button type="button" class="primary-button import-connection" disabled={!desktop || busy} on:click={() => void importConnection()}><FolderOpen size={17}/>Importar conexão do Android</button>{#if importedConnection}<p class="imported-note">Conexão importada. Clique em Conectar para continuar.</p>{/if}<label>Endereço do celular<input placeholder="192.168.1.20" type="text" bind:value={address} required disabled={busy}/></label><label>Código temporário<input placeholder="482 719" type="text" autocomplete="off" bind:value={token} required disabled={busy}/></label>{#if pairingVerification && busy}<div class="modal-notice"><ShieldCheck size={22}/><span>Confira no Android: <strong>{pairingVerification.match(/.{1,4}/g)?.join(' ')}</strong><br/>Se a verificação for igual, autorize no celular. Aguardando aprovação…</span></div>{/if}<details><summary>Conexão avançada por certificado</summary><p>Para a integração inicial, selecione o certificado PEM fornecido pelo app Android.</p><button type="button" class="small-button" disabled={!desktop || busy} on:click={() => void pickCertificate()}><FolderOpen size={16}/>{certificatePath ? 'Trocar certificado' : 'Selecionar certificado'}</button>{#if certificatePath}<span class="certificate-name">{certificatePath.split(/[\\/]/).pop()}</span>{/if}</details>
+        {:else if modal === 'move'}
+          <p class="move-selection">{moveFiles.length === 1 ? moveFiles[0].name : `${moveFiles.length} arquivos selecionados`}</p>
+          <div class="move-location">
+            <button type="button" class="icon-button" aria-label="Subir uma pasta" disabled={!moveFolder?.parent || busy || moveLoading} on:click={() => moveFolder?.parent && void browseMoveFolder(moveFolder.parent)}><ArrowUp size={17}/></button>
+            <span title={moveFolder?.path}>{moveFolder?.path === '/' ? 'Armazenamento do celular' : moveFolder?.path}</span>
+          </div>
+          <div class="move-folders" aria-label="Pastas de destino" aria-busy={moveLoading}>
+            {#if moveLoading}<p role="status">Carregando pastas…</p>
+            {:else if moveFolder}
+              {#each moveFolder.entries.filter(entry => entry.isDir) as folder (folder.path)}
+                <button type="button" class="small-button" disabled={busy} on:click={() => void browseMoveFolder(folder.path)}><Folder size={16}/><span>{folder.name}</span></button>
+              {:else}<p>Esta pasta não tem subpastas.</p>{/each}
+            {:else if device}
+              <button type="button" class="small-button" on:click={() => device && void browseMoveFolder(device.root)}>Tentar novamente</button>
+            {/if}
+          </div>
         {:else if modal === 'delete'}<p>{modalSide === 'local' ? 'Os itens selecionados serão enviados para a Lixeira do Windows.' : 'Os itens selecionados serão excluídos do celular. Esta operação pode ser permanente.'}</p><span class="delete-count">{(modalSide === 'local' ? localSelected : remoteSelected).length} item(s) selecionado(s)</span>
         {:else}<label>Nome<input bind:value={inputName} required maxlength="240" disabled={busy}/></label>{/if}
-        {#if modalError}<div class="form-error" role="alert">{modalError}</div>{/if}
-        <div class="modal-actions"><button type="button" class="small-button" disabled={busy} on:click={() => modal = null}>Cancelar</button><button class="primary-button" class:danger={modal === 'delete' && modalSide === 'remote'} disabled={busy || (!desktop && modal === 'connect')}>{#if busy}<LoaderCircle class="spin" size={17}/>{/if}{modal === 'connect' ? 'Conectar' : modal === 'mkdir' ? 'Criar pasta' : modal === 'rename' ? 'Salvar nome' : 'Confirmar'}</button></div>
+        {#if modalError}<div class="form-error" class:move-errors={modal === 'move'} role="alert">{modalError}</div>{/if}
+        <div class="modal-actions"><button type="button" class="small-button" disabled={busy} on:click={() => modal = null}>Cancelar</button><button class="primary-button" class:danger={modal === 'delete' && modalSide === 'remote'} disabled={busy || (!desktop && modal === 'connect') || (modal === 'move' && (!canMoveHere || moveLoading))}>{#if busy}<LoaderCircle class="spin" size={17}/>{/if}{modal === 'connect' ? 'Conectar' : modal === 'mkdir' ? 'Criar pasta' : modal === 'rename' ? 'Salvar nome' : modal === 'move' ? 'Mover para cá' : 'Confirmar'}</button></div>
       </form>
     </div>
   </div>
@@ -420,11 +496,35 @@
   <div class="context-dismiss" role="presentation" on:pointerdown={() => contextMenu = null} on:contextmenu|preventDefault={() => contextMenu = null}></div>
   <div bind:this={contextElement} class="file-context-menu" role="menu" aria-label="Opções de arquivos" style={`left:${contextMenu.x}px;top:${contextMenu.y}px`} on:keydown={contextKeys} tabindex="-1">
     <span class="context-caption">{contextMenu.entry?.name || 'Nesta pasta'}</span>
-    {#if contextMenu.entry}<button role="menuitem" on:click={() => contextAction('open')}><FolderOpen size={16}/>Abrir <kbd>Enter</kbd></button>{#if !contextMenu.entry.isDir}<button role="menuitem" on:click={() => contextAction('transfer')}><ArrowDownUp size={16}/>{contextMenu.side === 'local' ? 'Enviar ao celular' : 'Baixar no PC'}</button>{/if}{#if contextMenu.side === 'local' && !contextMenu.entry.isDir}<button role="menuitem" on:click={() => contextAction('external')}><ArrowUpRight size={16}/>Abrir no Windows</button>{/if}<div class="context-divider"></div><button role="menuitem" disabled={(contextMenu.side === 'local' ? localSelected : remoteSelected).length !== 1} on:click={() => contextAction('rename')}>Renomear <kbd>F2</kbd></button><button role="menuitem" class="context-danger" on:click={() => contextAction('delete')}>Excluir <kbd>Delete</kbd></button><div class="context-divider"></div>{/if}
+    {#if contextMenu.entry}<button role="menuitem" on:click={() => contextAction('open')}><FolderOpen size={16}/>Abrir <kbd>Enter</kbd></button>{#if !contextMenu.entry.isDir}<button role="menuitem" on:click={() => contextAction('transfer')}><ArrowDownUp size={16}/>{contextMenu.side === 'local' ? 'Enviar ao celular' : 'Baixar no PC'}</button>{/if}{#if contextMenu.side === 'local' && !contextMenu.entry.isDir}<button role="menuitem" on:click={() => contextAction('external')}><ArrowUpRight size={16}/>Abrir no Windows</button>{/if}{#if contextMenu.side === 'remote' && !contextMenu.entry.isDir}<button role="menuitem" on:click={() => contextAction('move')}><FolderInput size={16}/>Mover para…</button>{/if}<div class="context-divider"></div><button role="menuitem" disabled={(contextMenu.side === 'local' ? localSelected : remoteSelected).length !== 1} on:click={() => contextAction('rename')}>Renomear <kbd>F2</kbd></button><button role="menuitem" class="context-danger" on:click={() => contextAction('delete')}>Excluir <kbd>Delete</kbd></button><div class="context-divider"></div>{/if}
     <button role="menuitem" on:click={() => contextAction('mkdir')}><Plus size={16}/>Nova pasta</button><button role="menuitem" on:click={() => contextAction('select-all')}>Selecionar tudo <kbd>Ctrl+A</kbd></button><button role="menuitem" on:click={() => contextAction('refresh')}><RefreshCw size={16}/>Atualizar <kbd>F5</kbd></button>
   </div>
 {/if}
 
 <style>
   .transfer-open{display:flex;align-items:center;gap:14px;flex:1;min-width:0;text-align:left;padding:0;color:inherit;border-radius:8px}.transfer-open:disabled{opacity:1;cursor:default}.transfer-open:not(:disabled):hover strong{text-decoration:underline;color:var(--accent)}.transfer-open .transfer-details{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}.transfer-open .transfer-details>strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.transfer-file-symbol{width:34px;display:grid;place-items:center;color:var(--muted);flex-shrink:0}.transfer-open .progress-track{display:block}.transfer-open .progress-track>span{display:block;height:100%;background:var(--accent)}
+
+  .move-selection { margin-bottom: 12px; overflow-wrap: anywhere; }
+  .move-location {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+  .move-location span, .move-folders button span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .move-folders {
+    display: grid;
+    gap: 4px;
+    max-height: min(225px, 28vh);
+    overflow: auto;
+    padding: 4px;
+  }
+  .move-folders button { justify-content: flex-start; min-width: 0; }
+  .move-folders button :global(svg) { flex-shrink: 0; }
+  .move-errors { white-space: pre-wrap; max-height: 100px; overflow: auto; }
 </style>

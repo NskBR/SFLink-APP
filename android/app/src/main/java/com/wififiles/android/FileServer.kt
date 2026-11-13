@@ -112,7 +112,7 @@ class FileServer(private val context: Context, val pairing: Pairing, private val
         when (request[0] to endpoint) {
             "GET" to "/v1/device" -> {
                 val stats = StatFs(Environment.getExternalStorageDirectory().path)
-                json(output, JSONObject().put("name", "${Build.MANUFACTURER} ${Build.MODEL}").put("root", "/").put("freeBytes", stats.availableBytes).put("totalBytes", stats.totalBytes))
+                json(output, JSONObject().put("name", "${Build.MANUFACTURER} ${Build.MODEL}").put("root", "/").put("freeBytes", stats.availableBytes).put("totalBytes", stats.totalBytes).put("canMoveFiles", true))
             }
             "GET" to "/v1/files" -> json(output, storage.list(path))
             "GET" to "/v1/content" -> {
@@ -154,6 +154,13 @@ class FileServer(private val context: Context, val pairing: Pairing, private val
                 copy(input, buffer, length.toLong()) {}
                 val action = JSONObject(buffer.toString("UTF-8"))
                 val actionPath = action.getString("path")
+                if (action.getString("action") == "move") {
+                    val (source, destination) = storage.move(actionPath, action.getString("destination"))
+                    MediaScannerConnection.scanFile(context, arrayOf(source.path, destination.path), null, null)
+                    respond(output, 204, byteArrayOf())
+                    onComplete("Movido: ${destination.name}")
+                    return
+                }
                 storage.action(action.getString("action"), actionPath, if (action.isNull("name")) null else action.getString("name"))
                 val changed = if (action.getString("action") == "rename") File(storage.resolve(actionPath).parentFile, action.getString("name")) else storage.resolve(actionPath)
                 scan(changed)

@@ -65,6 +65,26 @@ class FileStorage(private val root: File) {
             else -> throw ApiFailure(400, "Operação inválida.")
         }
     }
+    fun move(path: String, folderPath: String): Pair<File, File> = synchronized(mutationLock) {
+        val source = resolve(virtual(resolve(path, false)), false)
+        if (!source.isFile) throw ApiFailure(404, "Arquivo não encontrado.")
+        val folder = resolve(virtual(resolve(folderPath)))
+        if (!folder.isDirectory) throw ApiFailure(404, "Pasta de destino não encontrada.")
+        if (folder == source.parentFile) throw ApiFailure(409, "O arquivo já está nesta pasta.")
+        val destination = File(folder, source.name)
+        if (folder == canonicalRoot && source.name.equals("Android", true)) {
+            throw ApiFailure(403, "Este nome é reservado na raiz do celular.")
+        }
+        try {
+            Files.move(source.toPath(), destination.toPath())
+        } catch (_: java.nio.file.FileAlreadyExistsException) {
+            throw ApiFailure(409, "Já existe um item com esse nome no destino.")
+        } catch (_: java.io.IOException) {
+            throw ApiFailure(403, "Não foi possível mover o arquivo para esta pasta.")
+        }
+        source to destination
+    }
+
     companion object {
         fun validateName(name: String) {
             if (name.isEmpty() || name.length > 240 || name != name.trim() || name.endsWith('.') || name == "." || name == ".." || name.any { it.code < 32 || it in "<>:\"/\\|?*" } || name.startsWith(".wifi-upload-")) throw ApiFailure(400, "Nome inválido.")

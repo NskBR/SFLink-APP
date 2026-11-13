@@ -7,11 +7,12 @@ Gerenciador de arquivos entre Windows e Android pela rede Wi-Fi. Explore as past
 - Desktop em Tauri 2, Svelte e Rust; Android nativo em Kotlin/Compose.
 - Envio e download em streaming, fila, progresso e cancelamento.
 - Navegação, busca, criação de pastas, renomeação e exclusão. Arquivos existentes não são substituídos automaticamente.
+- Movimentação de arquivos dentro do Android pelo menu **Mover para…** no painel do celular.
 - Primeiro pareamento por IP e código, com autorização e conferência no celular.
 - “Lembrar dispositivo” autoriza reconexão sem repetir o código. Revogação disponível no Android.
 - Atualizador pelo GitHub Releases, com conferência de tamanho/SHA-256 e confirmação de instalação.
 
-Desktop: **0.8.0** · Android: **0.3.0**. [Baixe a release desktop](https://github.com/NskBR/SFLink-APP/releases/tag/v0.8.0) ou o [APK Android 0.3.0](https://github.com/NskBR/SFLink-APP/releases/tag/v0.3.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
+Windows e Android: **0.9.0**. [Baixe o instalador e o APK no GitHub](https://github.com/NskBR/SFLink-APP/releases/tag/v0.9.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
 
 ## Capturas de demonstração
 

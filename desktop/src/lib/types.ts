@@ -1,7 +1,7 @@
 export interface Entry { name: string; path: string; isDir: boolean; size: number; modified: number | null }
 export interface Listing { path: string; parent: string | null; entries: Entry[] }
 export interface Shortcut { name: string; path: string }
-export interface Device { name: string; root: string; freeBytes: number; totalBytes: number }
+export interface Device { name: string; root: string; freeBytes: number; totalBytes: number; canMoveFiles?: boolean }
 export type Side = 'local' | 'remote';
 export interface Transfer { id: string; name: string; source: string; destination: string; direction: 'upload' | 'download'; total: number; transferred: number; status: 'queued' | 'running' | 'done' | 'error' | 'cancelled'; error?: string; openAfter?: boolean; localPath?: string; modified?: number | null }
 export function bytes(value: number): string {

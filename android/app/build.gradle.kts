@@ -2,7 +2,7 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.plugin.compose
 android {
     namespace = "com.wififiles.android"
     compileSdk { version = release(37) { minorApiLevel = 0 } }
-    defaultConfig { applicationId = "com.wififiles.android"; minSdk = 30; targetSdk = 36; versionCode = 3; versionName = "0.3.0"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
+    defaultConfig { applicationId = "com.wififiles.android"; minSdk = 30; targetSdk = 36; versionCode = 9; versionName = "0.9.0"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     // Signing material stays outside the repository and is supplied only at build time.

@@ -44,6 +44,8 @@ struct Device {
     root: String,
     free_bytes: u64,
     total_bytes: u64,
+    #[serde(default)]
+    can_move_files: bool,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -570,8 +572,9 @@ async fn remote_action(
     action: String,
     path: String,
     name: Option<String>,
+    destination: Option<String>,
 ) -> Result<(), String> {
-    if !["mkdir", "rename", "delete"].contains(&action.as_str()) {
+    if !["mkdir", "rename", "delete", "move"].contains(&action.as_str()) {
         return Err("Operação inválida.".into());
     }
     if let Some(ref name) = name {
@@ -580,7 +583,7 @@ async fn remote_action(
     let remote = remote(&state)?;
     let response = remote
         .request(reqwest::Method::POST, "v1/actions")?
-        .json(&serde_json::json!({"action": action, "path": path, "name": name}))
+        .json(&serde_json::json!({"action": action, "path": path, "name": name, "destination": destination}))
         .timeout(Duration::from_secs(30))
         .send()
         .await

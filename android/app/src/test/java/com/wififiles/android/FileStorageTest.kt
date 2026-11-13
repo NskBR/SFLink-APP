@@ -33,4 +33,28 @@ class FileStorageTest {
             assertEquals("first", root.resolve("renamed.txt").readText())
         } finally { root.deleteRecursively() }
     }
+    @Test fun movesFileWithoutReplacingDestination() {
+        val root = Files.createTempDirectory("wifi-test").toFile()
+        try {
+            val storage = FileStorage(root)
+            val source = root.resolve("Download").apply { mkdir() }.resolve("Minha música.mp3")
+            val target = root.resolve("Music").apply { mkdir() }.resolve(source.name)
+            source.writeText("original")
+            target.writeText("preserve")
+
+            assertEquals(409, assertThrows(ApiFailure::class.java) {
+                storage.move("/Download/${source.name}", "/Music")
+            }.status)
+            assertEquals("original", source.readText())
+            assertEquals("preserve", target.readText())
+            assertEquals(403, assertThrows(ApiFailure::class.java) {
+                storage.move("/Download/${source.name}", "/Android")
+            }.status)
+
+            assertTrue(target.delete())
+            storage.move("/Download/${source.name}", "/Music")
+            assertFalse(source.exists())
+            assertEquals("original", target.readText())
+        } finally { root.deleteRecursively() }
+    }
 }
