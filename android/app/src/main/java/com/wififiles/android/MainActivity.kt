@@ -13,6 +13,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -92,6 +93,23 @@ class MainActivity : ComponentActivity() {
         if (!file.isFile) return
         val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
         startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("application/json").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "Enviar conexão ao PC"))
+    }
+    private fun openTransferred(item: CompletedFile) {
+        val path = item.path ?: return
+        runCatching {
+            check(Environment.isExternalStorageManager()) { "Autorize o acesso aos arquivos para abrir este item." }
+            val storage = FileStorage(Environment.getExternalStorageDirectory())
+            val file = storage.resolve(storage.virtual(File(path)), false)
+            check(file.isFile && file.canRead()) { "O arquivo foi movido, excluído ou não está disponível." }
+            val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
+            val mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase(Locale.ROOT)) ?: "application/octet-stream"
+            val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            intent.clipData = ClipData.newRawUri(file.name, uri)
+            startActivity(intent)
+        }.onFailure {
+            feedback = if (it is android.content.ActivityNotFoundException) "Nenhum aplicativo instalado abre este tipo de arquivo." else it.message ?: "Não foi possível abrir o arquivo."
+        }
     }
     @Composable private fun Screen() {
         val updater = remember { AppUpdater(this) }
@@ -188,7 +206,7 @@ class MainActivity : ComponentActivity() {
                             Text("${formatBytes(state.transferred)} de ${formatBytes(state.total)}", color = Muted, fontSize = 12.sp)
                         }
                         if (state.history.isEmpty() && state.operation.isBlank()) { Icon(Icons.Outlined.SwapVert, null, tint = Muted, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 18.dp).size(36.dp)); Text("Tudo pronto para transferir", modifier = Modifier.align(Alignment.CenterHorizontally), fontSize = 15.sp); Text("Arraste arquivos no PC para enviar ao celular.", color = Muted, fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 18.dp)) }
-                        state.history.forEach { item -> Row(Modifier.fillMaxWidth().background(Raised, RoundedCornerShape(14.dp)).padding(13.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Check, null, tint = Accent, modifier = Modifier.size(19.dp)); Column { Text(item, fontSize = 13.sp); Text("Concluído", color = Accent, fontSize = 11.sp) } } }
+                        state.history.forEach { item -> Row(Modifier.fillMaxWidth().background(Raised, RoundedCornerShape(14.dp)).clickable(enabled = item.path != null, onClickLabel = "Abrir arquivo") { openTransferred(item) }.padding(13.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Check, null, tint = Accent, modifier = Modifier.size(19.dp)); Column(Modifier.weight(1f)) { Text(item.description, fontSize = 13.sp); Text(if (item.path != null) "Concluído · Toque para abrir" else "Concluído", color = Accent, fontSize = 11.sp) } } }
                     }
                 } else {
                     PanelCard {

@@ -23,7 +23,7 @@ class RememberedConnectionTest {
         trust.forget(id)
         lateinit var gate: PairingGate
         gate = PairingGate(first.certificate) { request -> if (request != null) gate.answer(request, true, true) }
-        var server = FileServer(context, first, gate, trust, {}, { _, _, _ -> }, {})
+        var server = FileServer(context, first, gate, trust, {}, { _, _, _ -> }, { _, _ -> })
         var thread = Thread { server.run() }.apply { start() }
         val ssl = pinned(first.certificate)
         try {
@@ -40,7 +40,7 @@ class RememberedConnectionTest {
             assertEquals(first.certificate, second.certificate)
             assertNotEquals(first.token, second.token)
             val reopened = TrustedPeers(context)
-            server = FileServer(context, second, PairingGate(second.certificate) {}, reopened, {}, { _, _, _ -> }, {})
+            server = FileServer(context, second, PairingGate(second.certificate) {}, reopened, {}, { _, _, _ -> }, { _, _ -> })
             thread = Thread { server.run() }.apply { start() }
             // The old pinned identity and remembered token work with the newly issued TLS leaf.
             assertEquals(200, request(ssl, "GET", "/v1/device", token).first)

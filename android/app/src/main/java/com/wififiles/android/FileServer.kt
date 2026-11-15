@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLServerSocket
 import javax.net.ssl.SSLSocket
 
-class FileServer(private val context: Context, val pairing: Pairing, private val gate: PairingGate, private val trusted: TrustedPeers, private val onPeer: (String) -> Unit, private val onProgress: (String, Long, Long) -> Unit, private val onComplete: (String) -> Unit) {
+class FileServer(private val context: Context, val pairing: Pairing, private val gate: PairingGate, private val trusted: TrustedPeers, private val onPeer: (String) -> Unit, private val onProgress: (String, Long, Long) -> Unit, private val onComplete: (String, File?) -> Unit) {
     private class Reply(stream: java.io.OutputStream) : BufferedOutputStream(stream, 128 * 1024) { var started = false }
     private val storage = FileStorage(Environment.getExternalStorageDirectory())
     private val socket = (pairing.tls.serverSocketFactory.createServerSocket() as SSLServerSocket).apply {
@@ -123,7 +123,7 @@ class FileServer(private val context: Context, val pairing: Pairing, private val
                     head(output, 200, length, "application/octet-stream")
                     copy(source, output, length) { done -> onProgress("Enviando ${file.name}", done, length) }
                 }
-                onComplete("Enviado: ${file.name}")
+                onComplete("Enviado: ${file.name}", file)
             }
             "PUT" to "/v1/content" -> {
                 if (query["overwrite"] != "false") throw ApiFailure(400, "Sobrescrita não permitida.")
@@ -145,7 +145,7 @@ class FileServer(private val context: Context, val pairing: Pairing, private val
                     }
                     scan(target)
                     respond(output, 201, byteArrayOf())
-                    onComplete("Recebido: ${target.name}")
+                    onComplete("Recebido: ${target.name}", target)
                 } finally { temporary.delete() }
             }
             "POST" to "/v1/actions" -> {
@@ -158,14 +158,14 @@ class FileServer(private val context: Context, val pairing: Pairing, private val
                     val (source, destination) = storage.move(actionPath, action.getString("destination"))
                     MediaScannerConnection.scanFile(context, arrayOf(source.path, destination.path), null, null)
                     respond(output, 204, byteArrayOf())
-                    onComplete("Movido: ${destination.name}")
+                    onComplete("Movido: ${destination.name}", destination)
                     return
                 }
                 storage.action(action.getString("action"), actionPath, if (action.isNull("name")) null else action.getString("name"))
                 val changed = if (action.getString("action") == "rename") File(storage.resolve(actionPath).parentFile, action.getString("name")) else storage.resolve(actionPath)
                 scan(changed)
                 respond(output, 204, byteArrayOf())
-                onComplete(when (action.getString("action")) { "mkdir" -> "Pasta criada: ${action.optString("name")}"; "rename" -> "Renomeado: ${action.optString("name")}"; else -> "Item excluído" })
+                onComplete(when (action.getString("action")) { "mkdir" -> "Pasta criada: ${action.optString("name")}"; "rename" -> "Renomeado: ${action.optString("name")}"; else -> "Item excluído" }, null)
             }
             else -> throw ApiFailure(404, "Operação não encontrada.")
         }

@@ -12,7 +12,7 @@ Gerenciador de arquivos entre Windows e Android pela rede Wi-Fi. Explore as past
 - “Lembrar dispositivo” autoriza reconexão sem repetir o código. Revogação disponível no Android.
 - Atualizador pelo GitHub Releases, com conferência de tamanho/SHA-256 e confirmação de instalação.
 
-Windows e Android: **0.9.0**. [Baixe o instalador e o APK no GitHub](https://github.com/NskBR/SFLink-APP/releases/tag/v0.9.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
+Windows e Android: **0.10.0**. [Baixe o instalador e o APK no GitHub](https://github.com/NskBR/SFLink-APP/releases/tag/v0.10.0). Os aparelhos precisam estar na mesma rede local; isolamento de clientes/broadcast bloqueado pode impedir descoberta ou conexão. Não há acesso às pastas privadas de outros apps Android.
 
 ## Capturas de demonstração
 
@@ -78,3 +78,7 @@ A titlebar não exibe mais um botão de consulta permanente. Atualizar aparece s
 O duplo clique procura uma cópia local já baixada antes de criar outra transferência. As novas cópias são registradas por identidade do celular, caminho remoto, tamanho e data, com verificação de leitura do arquivo local. O registro dura entre sessões e não armazena tokens. Se a cópia for removida, ficar inacessível ou mudar, o app permite baixar novamente sem substituir um arquivo existente. Para downloads de versões antigas ainda não registrados, a migração usa nome e tamanho na pasta aberta do PC; isso é uma heurística, não uma comparação de conteúdo por hash. Cópias conhecidas de outro dispositivo ou versão de arquivo não são adotadas por essa heurística.
 
 A lista de transferências mostra miniaturas e permite abrir os arquivos concluídos. Downloads abrem a cópia local; envios abrem o arquivo de origem no PC. Se uma cópia de download desaparecer, clicar na transferência oferece o mesmo fluxo de baixar novamente, com o celular conectado. O splash de atualização recebeu fundo transparente, cantos externos arredondados e identidade visual SFLink. O novo splash só é utilizado por atualizações iniciadas na 0.8.0 ou posterior.
+
+### Atualizações Android
+
+O Android consulta `updates/android.json` pelo endereço raw do repositório, com cache de seis horas e consulta manual limitada a uma tentativa por minuto. Publique o APK assinado antes de atualizar esse manifesto com versão, versionCode, URL, tamanho, SHA-256 e notas. O download valida o hash e a assinatura instalada antes de abrir a confirmação do Android.

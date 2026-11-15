@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.sp
                 Button(onClick = { updater.install(activity, transferring) }, enabled = !transferring && !updater.busy, modifier = Modifier.fillMaxWidth()) { Text("Instalar atualização") }
                 if (transferring) Text("Aguarde as transferências terminarem.", color = muted, fontSize = 12.sp)
             } else {
-                OutlinedButton(onClick = { updater.check() }, enabled = !updater.busy, modifier = Modifier.fillMaxWidth()) { Text(if (updater.busy) "Verificando…" else "Verificar atualizações") }
+                OutlinedButton(onClick = { updater.check(force = true) }, enabled = !updater.busy, modifier = Modifier.fillMaxWidth()) { Text(if (updater.busy) "Verificando…" else "Verificar atualizações") }
                 if (updater.offer != null) Button(onClick = { updater.download() }, enabled = !updater.busy, modifier = Modifier.fillMaxWidth()) { Text("Baixar atualização") }
             }
         }

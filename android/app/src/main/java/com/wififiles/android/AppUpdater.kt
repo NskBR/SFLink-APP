@@ -21,6 +21,7 @@ import javax.net.ssl.HttpsURLConnection
 internal data class UpdateOffer(val version: String, val name: String, val url: String, val size: Long, val hash: String, val notes: String)
 internal object UpdateRules {
     const val REPO = "NskBR/SFLink-APP"
+    const val MANIFEST_URL = "https://raw.githubusercontent.com/$REPO/main/updates/android.json"
     const val MAX_SIZE = 512L * 1024 * 1024
     fun version(raw: String): List<Long>? {
         val value = raw.removePrefix("v")
@@ -41,6 +42,7 @@ internal object UpdateRules {
 
 internal class AppUpdater(context: Context) {
     private val context = context.applicationContext
+    private val preferences = this.context.getSharedPreferences("app-updates", Context.MODE_PRIVATE)
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     var offer by mutableStateOf<UpdateOffer?>(null); private set
@@ -69,35 +71,51 @@ internal class AppUpdater(context: Context) {
         }
         error("Redirecionamentos demais.")
     }
-    fun check() {
+    fun check(force: Boolean = false) {
         if (busy || ready) return
+        val now = System.currentTimeMillis()
+        val lastAttempt = preferences.getLong("lastAttempt", 0)
+        val interval = if (force) 60_000L else 6 * 60 * 60 * 1000L
+        val cached = preferences.getString("manifest", null)
+        if (now >= lastAttempt && now - lastAttempt < interval) {
+            if (cached != null) runCatching { parseManifest(cached) }.onSuccess { offer = it }
+            message = if (offer != null) "Versão ${offer!!.version} disponível." else "Consulta recente. Tente novamente mais tarde."
+            return
+        }
+        preferences.edit().putLong("lastAttempt", now).apply()
         busy = true; error = ""; message = ""; offer = null
         executor.execute {
             val result = runCatching {
-                val connection = connection("https://api.github.com/repos/${UpdateRules.REPO}/releases/latest")
+                val connection = connection(UpdateRules.MANIFEST_URL)
                 try {
-                    if (connection.responseCode == 404) return@runCatching null
                     require(connection.responseCode == 200) { "GitHub respondeu HTTP ${connection.responseCode}. Tente novamente depois." }
                     val bytes = connection.inputStream.use { input ->
                         val output = java.io.ByteArrayOutputStream(); val buffer = ByteArray(8192)
                         while (true) { val count = input.read(buffer); if (count < 0) break; require(output.size() + count <= 2 * 1024 * 1024) { "Resposta de atualização grande demais." }; output.write(buffer, 0, count) }; output.toByteArray()
                     }
                     require(bytes.size <= 2 * 1024 * 1024) { "Resposta de atualização grande demais." }
-                    val release = JSONObject(String(bytes, Charsets.UTF_8))
-                    val version = release.getString("tag_name").removePrefix("v")
-                    require(UpdateRules.version(version) != null) { "A release precisa usar uma versão como v0.2.1." }
-                    if (release.optBoolean("draft") || release.optBoolean("prerelease") || !UpdateRules.newer(version, BuildConfig.VERSION_NAME)) return@runCatching null
-                    val assets = release.getJSONArray("assets")
-                    for (i in 0 until assets.length()) {
-                        val asset = assets.getJSONObject(i); val name = asset.optString("name"); val url = asset.optString("browser_download_url")
-                        val size = asset.optLong("size"); val digest = asset.optString("digest")
-                        if (name == "SFLink_${version}_android.apk" && UpdateRules.validAsset(name, url, size, digest)) return@runCatching UpdateOffer(version, name, url, size, digest.removePrefix("sha256:").lowercase(), release.optString("body"))
-                    }
-                    error("A release ainda não contém um APK Android com SHA-256 válido.")
+                    val raw = String(bytes, Charsets.UTF_8)
+                    val parsed = parseManifest(raw)
+                    preferences.edit().putString("manifest", raw).apply()
+                    parsed
                 } finally { connection.disconnect() }
             }
             main.post { busy = false; result.onSuccess { offer = it; message = if (it == null) "Nenhuma atualização pública disponível." else "Versão ${it.version} disponível." }.onFailure { error = it.message ?: "Não foi possível verificar atualizações." } }
         }
+    }
+    private fun parseManifest(raw: String): UpdateOffer? {
+        val manifest = JSONObject(raw)
+        val version = manifest.getString("version")
+        require(UpdateRules.version(version) != null && !version.startsWith("v")) { "Versão do manifesto inválida." }
+        if (!UpdateRules.newer(version, BuildConfig.VERSION_NAME)) return null
+        require(manifest.getLong("versionCode") > BuildConfig.VERSION_CODE) { "Código de versão inválido." }
+        val name = "SFLink_${version}_android.apk"
+        val url = manifest.getString("url")
+        val size = manifest.getLong("size")
+        val hash = manifest.getString("sha256").lowercase()
+        require(url == "https://github.com/${UpdateRules.REPO}/releases/download/v$version/$name" &&
+            UpdateRules.validAsset(name, url, size, "sha256:$hash")) { "APK ou SHA-256 do manifesto inválido." }
+        return UpdateOffer(version, name, url, size, hash, manifest.optString("notes"))
     }
     fun cancel() { cancelled = true }
     fun download() {

@@ -18,7 +18,9 @@ import androidx.core.app.NotificationCompat
 import java.io.File
 import java.util.concurrent.Executors
 
-data class SessionState(val starting: Boolean = false, val active: Boolean = false, val pairing: Pairing? = null, val peer: String = "", val operation: String = "", val transferred: Long = 0, val total: Long = 0, val history: List<String> = emptyList(), val error: String = "", val code: String = "", val pending: PairRequest? = null, val trusted: List<TrustedPeer> = emptyList())
+data class CompletedFile(val description: String, val path: String? = null)
+
+data class SessionState(val starting: Boolean = false, val active: Boolean = false, val pairing: Pairing? = null, val peer: String = "", val operation: String = "", val transferred: Long = 0, val total: Long = 0, val history: List<CompletedFile> = emptyList(), val error: String = "", val code: String = "", val pending: PairRequest? = null, val trusted: List<TrustedPeer> = emptyList())
 object Session {
     var gate: PairingGate? = null
     var trust: TrustedPeers? = null
@@ -75,7 +77,7 @@ class SharingService : Service() {
                 val next = FileServer(this, pairing, gate, trusted,
                     onPeer = { peer -> lastPeer = android.os.SystemClock.elapsedRealtime(); Session.update { it.copy(peer = peer) } },
                     onProgress = { operation, done, total -> Session.update { it.copy(operation = operation, transferred = done, total = total) } },
-                    onComplete = { description -> Session.update { it.copy(operation = "", transferred = 0, total = 0, history = (listOf(description) + it.history).take(12)) } })
+                    onComplete = { description, file -> Session.update { it.copy(operation = "", transferred = 0, total = 0, history = (listOf(CompletedFile(description, file?.absolutePath)) + it.history).take(12)) } })
                 server = next
                 Session.revoke = { next.revokeConnections(); Session.update { it.copy(peer = "", trusted = trusted.list()) } }
                 bootstrap = BootstrapServer(pairing.certificate)
