@@ -1,0 +1,7 @@
+{
+  "version": "0.10.0",
+  "url": "https://github.com/NskBR/SFLink-APP/releases/download/v0.10.0/SFLink_0.10.0_x64-setup.exe",
+  "size": 3398766,
+  "sha256": "306128b8b5eac538301459775654425e47d5f054b4d871aab3c31eea4f548235",
+  "notes": "Setup recompilado com atualização por manifesto. Reinstale o setup para corrigir a consulta da versão 0.10.0."
+}

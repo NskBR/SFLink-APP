@@ -82,3 +82,7 @@ A lista de transferências mostra miniaturas e permite abrir os arquivos conclu�
 ### Atualizações Android
 
 O Android consulta `updates/android.json` pelo endereço raw do repositório, com cache de seis horas e consulta manual limitada a uma tentativa por minuto. Publique o APK assinado antes de atualizar esse manifesto com versão, versionCode, URL, tamanho, SHA-256 e notas. O download valida o hash e a assinatura instalada antes de abrir a confirmação do Android.
+
+### Atualizações Windows
+
+O desktop consulta `updates/desktop.json` pelo endereço raw do repositório. Ao publicar um setup, atualize versão, URL, tamanho, SHA-256 e notas nesse manifesto. A consulta inicial ocorre após dez segundos e se repete a cada sessenta segundos. O usuário inicia a instalação pelo botão de atualização.

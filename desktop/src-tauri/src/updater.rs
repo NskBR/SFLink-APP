@@ -13,7 +13,7 @@ pub static INSTALLING: AtomicBool = AtomicBool::new(false);
 #[derive(Clone, Deserialize)]
 struct Asset { name: String, browser_download_url: String, size: u64, digest: Option<String> }
 #[derive(Deserialize)]
-struct Release { tag_name: String, body: Option<String>, draft: bool, prerelease: bool, assets: Vec<Asset> }
+struct Manifest { version: String, url: String, size: u64, sha256: String, notes: String }
 #[derive(Clone)]
 struct Approved { asset: Asset, hash: String }
 #[derive(Default)]
@@ -45,6 +45,17 @@ fn approved_asset(asset: &Asset) -> Option<Approved> {
         || hash.len() != 64 || !hash.bytes().all(|c| c.is_ascii_hexdigit()) { return None; }
     Some(Approved { asset: asset.clone(), hash: hash.to_ascii_lowercase() })
 }
+fn manifest_asset(manifest: &Manifest) -> Option<Approved> {
+    version(&manifest.version)?;
+    let name = format!("SFLink_{}_x64-setup.exe", manifest.version);
+    if manifest.url != format!("https://github.com/{REPO}/releases/download/v{}/{}", manifest.version, name) {
+        return None;
+    }
+    approved_asset(&Asset {
+        name, browser_download_url: manifest.url.clone(), size: manifest.size,
+        digest: Some(format!("sha256:{}", manifest.sha256)),
+    })
+}
 fn client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder().user_agent("SFLink-updater").https_only(true)
         .connect_timeout(Duration::from_secs(15)).timeout(Duration::from_secs(600))
@@ -59,15 +70,21 @@ pub async fn check_for_updates(state: State<'_, Updater>) -> Result<UpdateInfo, 
         runtime.approved = None;
     }
     let current = env!("CARGO_PKG_VERSION");
-    let response = client()?.get(format!("https://api.github.com/repos/{REPO}/releases/latest")).send().await.map_err(|_| "Não foi possível consultar atualizações. Verifique sua internet.".to_string())?;
-    if response.status() == reqwest::StatusCode::NOT_FOUND {
-        return Ok(UpdateInfo { available: false, version: current.into(), notes: "Ainda não há uma release pública.".into(), size: 0, installable: false });
+    let mut response = client()?.get(format!("https://raw.githubusercontent.com/{REPO}/main/updates/desktop.json"))
+        .timeout(Duration::from_secs(15)).send().await
+        .map_err(|_| "Não foi possível consultar atualizações. Verifique sua internet.".to_string())?
+        .error_for_status().map_err(|e| format!("Falha ao consultar o manifesto: {e}"))?;
+    let mut data = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
+        if data.len() + chunk.len() > 64 * 1024 { return Err("Manifesto de atualização grande demais.".into()); }
+        data.extend_from_slice(&chunk);
     }
-    let release: Release = response.error_for_status().map_err(|e| format!("Falha ao consultar o GitHub: {e}"))?.json().await.map_err(|_| "Resposta de atualização inválida.".to_string())?;
-    let latest = version(&release.tag_name).ok_or("A release precisa usar uma versão no formato v0.2.1.")?;
-    let available = !release.draft && !release.prerelease && latest > version(current).ok_or("Versão local inválida.")?;
-    let approved = if available { release.assets.iter().filter(|asset| asset.name == format!("SFLink_{}_x64-setup.exe", release.tag_name.trim_start_matches('v'))).find_map(approved_asset) } else { None };
-    let info = UpdateInfo { available, version: release.tag_name.trim_start_matches('v').into(), notes: release.body.unwrap_or_default(), size: approved.as_ref().map(|a| a.asset.size).unwrap_or(0), installable: approved.is_some() };
+    let manifest: Manifest = serde_json::from_slice(&data).map_err(|_| "Manifesto de atualização inválido.".to_string())?;
+    let latest = version(&manifest.version).ok_or("Versão do manifesto inválida.")?;
+    let available = latest > version(current).ok_or("Versão local inválida.")?;
+    let validated = manifest_asset(&manifest).ok_or("Instalador ou SHA-256 do manifesto inválido.")?;
+    let approved = if available { Some(validated) } else { None };
+    let info = UpdateInfo { available, version: manifest.version, notes: manifest.notes, size: approved.as_ref().map(|a| a.asset.size).unwrap_or(0), installable: approved.is_some() };
     state.inner.lock().map_err(|e| e.to_string())?.approved = approved;
     Ok(info)
 }
@@ -176,6 +193,19 @@ fn parent_start_ticks() -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn manifest_requires_matching_release_and_hash() {
+        let mut manifest = Manifest {
+            version: "0.10.0".into(),
+            url: "https://github.com/NskBR/SFLink-APP/releases/download/v0.10.0/SFLink_0.10.0_x64-setup.exe".into(),
+            size: 100, sha256: "a".repeat(64), notes: String::new(),
+        };
+        assert!(manifest_asset(&manifest).is_some());
+        manifest.version = "0.11.0".into();
+        assert!(manifest_asset(&manifest).is_none());
+        manifest.version = "0.10.0".into();
+        manifest.sha256.clear();
+        assert!(manifest_asset(&manifest).is_none());
+    }
     #[test] fn versions_are_numeric_and_stable() {
         assert!(version("v0.10.0") > version("0.2.9"));
         for bad in ["TESTE", "1.0.0-beta", "1.0", "1.0.0.1", "1..0"] { assert!(version(bad).is_none()); }
